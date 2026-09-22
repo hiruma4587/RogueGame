@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS saves (id TEXT PRIMARY KEY,state TEXT NOT NULL,updated_at INTEGER NOT NULL);CREATE INDEX IF NOT EXISTS idx_saves_updated_at ON saves(updated_at);
