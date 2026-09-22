@@ -1,4 +1,7 @@
-const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);let W,H,dpr,state='menu',player,enemies=[],bullets=[],drops=[],particles=[],keys={},mouse={x:0,y:0},elapsed=0,spawn=0,last=0;
+const canvas=document.querySelector('#game');
+const ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+window.addEventListener('error',e=>console.error('RogueGame:',e.error||e.message));let W,H,dpr,state='menu',player,enemies=[],bullets=[],drops=[],particles=[],keys={},mouse={x:0,y:0},elapsed=0,spawn=0,last=0;
 const upgrades=[['锋利武器','攻击伤害 +25%',p=>p.damage*=1.25],['迅捷','移动速度 +18%',p=>p.speed*=1.18],['生命强化','最大生命 +30，并回复 30',p=>{p.maxHp+=30;p.hp=Math.min(p.maxHp,p.hp+30)}],['多重射击','同时发射更多子弹',p=>p.multishot=Math.min(5,p.multishot+1)],['攻击速度','攻击间隔 -18%',p=>p.fireRate=Math.max(.12,p.fireRate*.82)],['磁力','拾取范围 +50%',p=>p.magnet*=1.5]];
 function resize(){dpr=devicePixelRatio||1;W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);canvas.addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});canvas.addEventListener('pointerdown',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
