@@ -72,7 +72,7 @@ function update(dt){elapsed+=dt;spawn-=dt;
 if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾抵挡了致命伤害')}else{end();return}}}}
  for(const b of bullets){b.age=(b.age||0)+dt;if(b.weapon)weaponFx(b);if(b.boomerang){b.age=(b.age||0)+dt;if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage;if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.spawned&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
  bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60);enemies=enemies.filter(e=>!e.dead);
- if(boss)updateBoss(dt);
+ if(boss&&!boss.dead)updateBoss(dt);if(boss&&!boss.defeated&&boss.hp<=0){finishBoss();return;}
  for(const c of chests){c.life-=dt;if(!c.dead&&dist(c,player)<player.r+c.r+14)openChest(c)}chests=chests.filter(c=>!c.dead&&c.life>0);events=events.filter(e=>{e.life-=dt;return e.life>0});
  for(const d of drops){let dd=dist(d,player);if(dd<player.magnet){let a=Math.atan2(player.y-d.y,player.x-d.x);d.x+=Math.cos(a)*220*dt;d.y+=Math.sin(a)*220*dt}if(dist(d,player)<player.r+d.r){if(d.type==='xp')gainXp(d.v);else if(d.type==='power'){const choices=['damage','rate','heal'];const type=choices[Math.floor(Math.random()*choices.length)];if(type==='damage')player.damageMul*=1.12;else if(type==='rate')player.rateMul*=.9;else player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.25);toast(type==='damage'?'强化核心：伤害 +12%':type==='rate'?'强化核心：攻击速度 +10%':'强化核心：恢复 25% 生命')}else if(d.type==='bomb'){for(const e of enemies){if(!e.dead&&dist(d,e)<110){e.hp-=d.v;if(e.hp<=0)kill(e)}}for(let i=0;i<24;i++)particles.push({x:d.x,y:d.y,vx:(Math.random()-.5)*300,vy:(Math.random()-.5)*300,life:.5});toast('爆裂核心：范围伤害')}else player.gold+=d.v;d.dead=true}}drops=drops.filter(d=>!d.dead);
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);ui()}
@@ -246,19 +246,7 @@ function persistMeta(){try{localStorage.setItem('roguegame_meta',JSON.stringify(
 function restoreLocalMeta(){try{const x=JSON.parse(localStorage.getItem('roguegame_meta')||'null');if(x&&typeof x==='object'){meta={gold:Number(x.gold||0),upgrades:{hp:Number(x.upgrades?.hp||0),damage:Number(x.upgrades?.damage||0),speed:Number(x.upgrades?.speed||0)}}}}catch(e){}}
 function bankRunGold(rate=1){if(player&&player.gold>0){const earned=Math.floor(player.gold*Math.max(0,Math.min(1,rate)));meta.gold+=earned;player.gold=0;persistMeta();return earned}return 0}
 async function end(){const runGold=player.gold;const keptGold=bankRunGold(.5);state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+runGold+' · 本局保留 '+keptGold+' · 永久金币 '+meta.gold+' · 生存 '+fmt(elapsed)+' · 正在保存…';show('result');const result=await saveCloud(false);$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+runGold+' · 本局保留 '+keptGold+' · 永久金币 '+meta.gold+' · '+(result.ok?'云存档已保存':'云存档保存失败：'+result.error)}
-async function victory(){
-  if(!boss||!boss.spawned||!boss.defeated)return;
-  const earned=player.gold+100;
-  player.gold=earned;
-  bankRunGold(1);
-  state='victory';
-  $('victoryText').textContent='最终 Boss 已击败！本局获得 '+earned+' 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 正在保存…';
-  show('victory');
-  const result=await saveCloud(false);
-  $('victoryText').textContent=result.ok
-    ? '最终 Boss 已击败！本局获得 '+earned+' 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 云存档已保存'
-    : '最终 Boss 已击败！本局获得 '+earned+' 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 保存失败：'+result.error;
-}
+async function finishBoss(){if(!boss||boss.defeated)return;boss.hp=0;boss.dead=true;boss.defeated=true;bullets=[];enemies=[];state='victory';const earned=player.gold+100;player.gold=earned;const kept=bankRunGold(1);hide('levelup');hide('result');hide('menu');show('victory');$('victoryText').textContent='最终 Boss 已击败！本局获得 '+earned+' 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 正在保存…';for(let i=0;i<60;i++){const a=Math.random()*Math.PI*2,s=80+Math.random()*320;particles.push({x:boss.x,y:boss.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.8+Math.random()*.7,color:'#ffd45c'})}const result=await saveCloud(false);$('victoryText').textContent=result.ok?'最终 Boss 已击败！本局获得 '+earned+' 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 云存档已保存':'最终 Boss 已击败！本局获得 '+earned+' 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 保存失败：'+result.error}
 function fmt(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
 function ui(){$('hp').textContent=Math.ceil(player.hp)+'/'+player.maxHp;$('level').textContent=player.level;$('gold').textContent=player.gold;$('time').textContent=fmt(elapsed);$('hpbar').style.width=Math.max(0,player.hp/player.maxHp*100)+'%';$('xpbar').style.width=Math.min(100,player.xp/player.next*100)+'%';$('weapon').textContent=Object.values(player.weapons).filter(Boolean).map(w=>w.name+' Lv.'+w.level).join(' · ');if(boss){$('bossbar').classList.remove('hidden');$('bossfill').style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%'}else $('bossbar').classList.add('hidden')}
 function weaponFx(b){
