@@ -1,6 +1,6 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
 let W,H,dpr,state='menu',gameSpeed=1,bossRewards=[],relics=[],meta={gold:0,upgrades:{hp:0,damage:0,speed:0}},player,enemies=[],bullets=[],drops=[],particles=[],chests=[],events=[],keys={},elapsed=0,spawn=0,last=0,boss=null,miniBoss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0,nextChest=90,nextEvent=60,loopStage='boot',runtimeErrorShown=false;
-const MAX_ENEMIES=180,MAX_BULLETS=360,MAX_PARTICLES=700;
+const MAX_ENEMIES=140,MAX_BULLETS=220,MAX_PARTICLES=450;
 const WEAPONS={
   magic:{name:'魔法弹',desc:'自动追踪最近敌人',level:1,damage:18,rate:.45,count:1,speed:600,life:1.2,pierce:0,color:'#ffe08a'},
   knife:{name:'飞刀',desc:'高速穿透敌人',level:0,damage:12,rate:.7,count:1,speed:720,life:1.3,pierce:1,color:'#b8e1ff'},
@@ -370,6 +370,7 @@ function updateSpeedButton(){
   const b=$('speed');
   if(b)b.textContent=gameSpeed===2?'速度 ×2':'速度 ×1';
 }
+window.addEventListener('error',e=>{if(state==='playing')reportRuntimeError(e.error||new Error(e.message||'脚本错误'),'window.error')});window.addEventListener('unhandledrejection',e=>{if(state==='playing')reportRuntimeError(e.reason||new Error('Promise rejected'),'unhandledrejection')});
 window.toggleSpeed=toggleSpeed;window.openMeta=openMeta;window.closeMeta=closeMeta;window.goHome=goHome;
 restoreLocalMeta();
 
