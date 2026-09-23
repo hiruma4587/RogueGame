@@ -40,7 +40,8 @@ canvas.addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
 
 function fresh(){return{x:W/2,y:H/2,r:15,hp:100+meta.upgrades.hp*10,maxHp:100+meta.upgrades.hp*10,speed:230*(1+meta.upgrades.speed*.05),damageMul:1+meta.upgrades.damage*.05,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
 function start(data){canvas.style.pointerEvents='auto';gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
-function hide(id){$(id).classList.add('hidden')}function show(id){$(id).classList.remove('hidden')}
+function hide(id){const el=$(id);if(el)el.classList.add('hidden')}function show(id){const el=$(id);if(el)el.classList.remove('hidden')}
+function goHome(){state='menu';gameSpeed=1;updateSpeedButton();hide('result');hide('victory');hide('levelup');hide('metaPanel');hide('joystick');show('menu');canvas.style.pointerEvents='none';renderMeta()}
 function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000)*gameSpeed;last=t;update(dt);draw();requestAnimationFrame(loop)}
 function update(dt){elapsed+=dt;spawn-=dt;
  let dx=(keys.d?1:0)-(keys.a?1:0),dy=(keys.s?1:0)-(keys.w?1:0);if(joystick.active){dx+=joystick.x;dy+=joystick.y}let l=Math.hypot(dx,dy)||1;if(dx||dy){player.x=Math.max(20,Math.min(W-20,player.x+dx/l*player.speed*dt));player.y=Math.max(20,Math.min(H-20,player.y+dy/l*player.speed*dt))}
@@ -278,7 +279,7 @@ function updateSpeedButton(){
   const b=$('speed');
   if(b)b.textContent=gameSpeed===2?'速度 ×2':'速度 ×1';
 }
-window.toggleSpeed=toggleSpeed;window.openMeta=openMeta;window.closeMeta=closeMeta;
+window.toggleSpeed=toggleSpeed;window.openMeta=openMeta;window.closeMeta=closeMeta;window.goHome=goHome;
 restoreLocalMeta();
 loadCloud();
 
@@ -295,6 +296,7 @@ window.start=start;window.loadCloud=loadCloud;window.saveCloud=saveCloud;window.
     else if(id==='continue') window.loadCloud();
     else if(id==='save') window.saveCloud(true);
     else if(id==='meta'||id==='metaPanel') window.openMeta();
+    else if(id==='home'||id==='victoryHome'||id==='resultHome') window.goHome();
     else if(id==='metaClose') window.closeMeta();
     else if(id==='speed') window.toggleSpeed();
   },true);
