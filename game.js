@@ -70,7 +70,7 @@ function update(dt){elapsed+=dt;spawn-=dt;
       player.hp-=e.dmg*dt;
     }
 if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾抵挡了致命伤害')}else{end();return}}}}
- for(const b of bullets){if(b.boomerang){b.age=(b.age||0)+dt;if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage;if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.spawned&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
+ for(const b of bullets){b.age=(b.age||0)+dt;if(b.weapon)weaponFx(b);if(b.boomerang){b.age=(b.age||0)+dt;if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage;if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.spawned&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
  bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60);enemies=enemies.filter(e=>!e.dead);
  if(boss)updateBoss(dt);
  for(const c of chests){c.life-=dt;if(!c.dead&&dist(c,player)<player.r+c.r+14)openChest(c)}chests=chests.filter(c=>!c.dead&&c.life>0);events=events.filter(e=>{e.life-=dt;return e.life>0});
@@ -177,7 +177,7 @@ function shootWeapon(id,w){
   }
 }
 function hitEnemy(e,b){
-  e.hp-=b.damage*(e.shieldTimer>0?(1-(e.shield||.45)):1);
+  e.hp-=b.damage*(e.shieldTimer>0?(1-(e.shield||.45)):1);hitFx(e.x,e.y,b.weapon==='fire'?'#ff7a45':'#fff');
   if(b.weapon==='ice'){e.slow=.45;e.slowTimer=2.5;}
   if(b.weapon==='fire'){
     const w=player.weapons.fire;
@@ -261,6 +261,17 @@ async function victory(){
 }
 function fmt(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
 function ui(){$('hp').textContent=Math.ceil(player.hp)+'/'+player.maxHp;$('level').textContent=player.level;$('gold').textContent=player.gold;$('time').textContent=fmt(elapsed);$('hpbar').style.width=Math.max(0,player.hp/player.maxHp*100)+'%';$('xpbar').style.width=Math.min(100,player.xp/player.next*100)+'%';$('weapon').textContent=Object.values(player.weapons).filter(Boolean).map(w=>w.name+' Lv.'+w.level).join(' · ');if(boss){$('bossbar').classList.remove('hidden');$('bossfill').style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%'}else $('bossbar').classList.add('hidden')}
+function weaponFx(b){
+  const x=b.x,y=b.y,c=b.weapon==='magic'?'#ffe08a':b.weapon==='knife'?'#b8e1ff':b.weapon==='fire'?'#ff7a45':b.weapon==='lightning'?'#8fd8ff':b.weapon==='boomerang'?'#d6b3ff':b.weapon==='ice'?'#8cecff':'#fff2a8';
+  ctx.save();ctx.globalAlpha=.85;
+  if(b.weapon==='fire'){ctx.beginPath();ctx.arc(x,y,15+Math.sin(b.age*18)*3,0,Math.PI*2);ctx.fillStyle=c;ctx.shadowBlur=22;ctx.shadowColor=c;ctx.fill()}
+  else if(b.weapon==='lightning'){ctx.strokeStyle=c;ctx.lineWidth=3;ctx.shadowBlur=14;ctx.shadowColor=c;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-Math.cos(b.a)*34,y-Math.sin(b.a)*34);ctx.stroke()}
+  else {ctx.fillStyle=c;ctx.shadowBlur=12;ctx.shadowColor=c;ctx.beginPath();ctx.arc(x,y,b.weapon==='holy'?9:6,0,Math.PI*2);ctx.fill()}
+  ctx.restore();
+}
+function hitFx(x,y,color){
+  for(let i=0;i<7;i++){const a=Math.random()*Math.PI*2,s=70+Math.random()*130;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.25,color})}
+}
 function draw(){
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#0b0e14';
