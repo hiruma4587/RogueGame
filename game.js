@@ -58,3 +58,5 @@ function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#0b0e14';ctx.fillRect(0,0,
 async function saveCloud(manual){try{let r=await fetch('/api/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({player,elapsed})});if(!r.ok)throw Error();if(manual)toast('云存档已保存')}catch(e){if(manual)toast('云存档不可用')}}
 async function loadCloud(){try{let r=await fetch('/api/save');if(!r.ok)throw Error();let d=await r.json();if(d.save){start(d.save.player);toast('已读取云存档')}else toast('暂无云存档')}catch(e){toast('暂无可用云存档')}}
 function toast(s){$('toast').textContent=s;$('toast').style.opacity=1;setTimeout(()=>$('toast').style.opacity=0,1600)}
+
+window.start=start;window.loadCloud=loadCloud;window.saveCloud=saveCloud;
