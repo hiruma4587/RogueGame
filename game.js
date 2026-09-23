@@ -74,7 +74,7 @@ if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾
  bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60);enemies=enemies.filter(e=>!e.dead);
  if(boss)updateBoss(dt);
  for(const c of chests){c.life-=dt;if(!c.dead&&dist(c,player)<player.r+c.r+14)openChest(c)}chests=chests.filter(c=>!c.dead&&c.life>0);events=events.filter(e=>{e.life-=dt;return e.life>0});
- for(const d of drops){let dd=dist(d,player);if(dd<player.magnet){let a=Math.atan2(player.y-d.y,player.x-d.x);d.x+=Math.cos(a)*220*dt;d.y+=Math.sin(a)*220*dt}if(dist(d,player)<player.r+d.r){if(d.type==='xp')gainXp(d.v);else if(d.type==='power'){const choices=['damage','rate','heal'];const type=choices[Math.floor(Math.random()*choices.length)];if(type==='damage')player.damageMul*=1.12;else if(type==='rate')player.rateMul*=.9;else player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.25);toast(type==='damage'?'强化核心：伤害 +12%':type==='rate'?'强化核心：攻击速度 +10%':'强化核心：恢复 25% 生命')}else player.gold+=d.v;d.dead=true}}drops=drops.filter(d=>!d.dead);
+ for(const d of drops){let dd=dist(d,player);if(dd<player.magnet){let a=Math.atan2(player.y-d.y,player.x-d.x);d.x+=Math.cos(a)*220*dt;d.y+=Math.sin(a)*220*dt}if(dist(d,player)<player.r+d.r){if(d.type==='xp')gainXp(d.v);else if(d.type==='power'){const choices=['damage','rate','heal'];const type=choices[Math.floor(Math.random()*choices.length)];if(type==='damage')player.damageMul*=1.12;else if(type==='rate')player.rateMul*=.9;else player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.25);toast(type==='damage'?'强化核心：伤害 +12%':type==='rate'?'强化核心：攻击速度 +10%':'强化核心：恢复 25% 生命')}else if(d.type==='bomb'){for(const e of enemies){if(!e.dead&&dist(d,e)<110){e.hp-=d.v;if(e.hp<=0)kill(e)}}for(let i=0;i<24;i++)particles.push({x:d.x,y:d.y,vx:(Math.random()-.5)*300,vy:(Math.random()-.5)*300,life:.5});toast('爆裂核心：范围伤害')}else player.gold+=d.v;d.dead=true}}drops=drops.filter(d=>!d.dead);
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);ui()}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function eliteSkill(e){
@@ -194,7 +194,7 @@ function kill(e){
   if(e.type==='splitter'&&e.split>0){
     for(let i=0;i<2;i++){const a=i*Math.PI+Math.random()*.6;enemies.push({id:crypto.randomUUID(),x:e.x,y:e.y,r:9,hp:e.maxHp*.3,maxHp:e.maxHp*.3,speed:e.speed*1.35,dmg:8,elite:false,type:'normal',dead:false,shot:0,split:0})}
   }
-  drops.push({x:e.x,y:e.y,r:6,type:'xp',v:e.elite?5:(e.type==='tank'?4:2)});if(Math.random()<.14)drops.push({x:e.x+5,y:e.y+5,r:5,type:'gold',v:e.elite?5:1});if(e.elite&&Math.random()<.28)drops.push({x:e.x-6,y:e.y-6,r:7,type:'power',v:1});for(let i=0;i<7;i++)particles.push({x:e.x,y:e.y,vx:(Math.random()-.5)*150,vy:(Math.random()-.5)*150,life:.35})}
+  drops.push({x:e.x,y:e.y,r:6,type:'xp',v:e.elite?5:(e.type==='tank'?4:2)});if(Math.random()<.14)drops.push({x:e.x+5,y:e.y+5,r:5,type:'gold',v:e.elite?5:1});if(e.elite&&Math.random()<.28)drops.push({x:e.x-6,y:e.y-6,r:7,type:'power',v:1});if(e.elite&&Math.random()<.12)drops.push({x:e.x+8,y:e.y-8,r:8,type:'bomb',v:45});for(let i=0;i<7;i++)particles.push({x:e.x,y:e.y,vx:(Math.random()-.5)*150,vy:(Math.random()-.5)*150,life:.35})}
 function gainXp(v){player.xp+=v*player.xpMul;while(player.xp>=player.next){player.xp-=player.next;player.level++;player.next=Math.floor(player.next*1.32);openLevelUp()}}
 function openLevelUp(){state='levelup';$('choices').innerHTML='';const opts=options();opts.forEach(o=>{const el=document.createElement('div');el.className='choice';el.innerHTML='<strong>'+o.title+'</strong><span>'+o.desc+'</span>';el.onclick=()=>{o.apply();hide('levelup');state='playing';last=performance.now();requestAnimationFrame(loop)};$('choices').appendChild(el)});show('levelup')}
 function options(){
@@ -276,7 +276,7 @@ function draw(){
     ctx.strokeStyle='#fff0a0';ctx.lineWidth=2;ctx.strokeRect(-18,-11,36,24);ctx.restore();
   }
   for(const d of drops){
-    ctx.fillStyle=d.type==='xp'?'#63a4ff':d.type==='power'?'#d56cff':'#ffd45c';
+    ctx.fillStyle=d.type==='xp'?'#63a4ff':d.type==='power'?'#d56cff':d.type==='bomb'?'#ff6b6b':'#ffd45c';
     ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,7);ctx.fill();
   }
   for(const b of bullets){
