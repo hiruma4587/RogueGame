@@ -5,6 +5,11 @@ const WEAPONS={
   knife:{name:'飞刀',desc:'高速穿透敌人',level:0,damage:12,rate:.7,count:1,speed:720,life:1.3,pierce:1,color:'#b8e1ff'},
   fire:{name:'火球',desc:'命中后爆炸',level:0,damage:30,rate:1.25,count:1,speed:420,life:1.6,pierce:0,color:'#ff9b5e'}
 };
+const EVOLUTIONS={
+  magic:{name:'奥术核心',desc:'魔法弹进化：伤害、数量与攻击速度大幅提升',apply:w=>{w.evolved=true;w.name='奥术核心';w.damage*=2;w.count=Math.min(6,(w.count||1)+2);w.rate*=.65;w.pierce=(w.pierce||0)+1}},
+  knife:{name:'刀锋风暴',desc:'飞刀进化：同时投射更多飞刀并获得穿透',apply:w=>{w.evolved=true;w.name='刀锋风暴';w.damage*=1.8;w.count=Math.min(8,(w.count||1)+4);w.rate*=.7;w.pierce=(w.pierce||0)+2}},
+  fire:{name:'陨星',desc:'火球进化：爆炸范围与伤害大幅提升',apply:w=>{w.evolved=true;w.name='陨星';w.damage*=2.2;w.rate*=.78;w.life*=1.15}}
+};
 const PASSIVES=[
  ['锋利武器','所有武器伤害 +20%',p=>p.damageMul*=1.2],
  ['迅捷','移动速度 +15%',p=>p.speed*=1.15],
@@ -43,11 +48,38 @@ function spawnEnemy(){let s=Math.floor(Math.random()*4),x=s<2?(s?W+30:-30):Math.
 function nearest(){return enemies.reduce((a,e)=>dist(e,player)<dist(a,player)?e:a,enemies[0])}
 function autoShoot(){for(const [id,w] of Object.entries(player.weapons)){if(!w||w.level<=0)continue;w.cd=(w.cd||0)-.016;if(w.cd<=0){shootWeapon(id,w);w.cd=w.rate*player.rateMul}}}
 function shootWeapon(id,w){let t=nearest();if(!t)return;let base=Math.atan2(t.y-player.y,t.x-player.x),count=w.count||1;for(let i=0;i<count;i++){let spread=(i-(count-1)/2)*.14;bullets.push({x:player.x,y:player.y,a:base+spread,speed:w.speed,r:id==='fire'?8:5,damage:w.damage*player.damageMul*(Math.random()<player.crit?2:1),life:w.life,pierce:w.pierce||0,weapon:id,hit:[]})}}
-function hitEnemy(e,b){e.hp-=b.damage;if(b.weapon==='fire')for(const other of enemies)if(!other.dead&&dist(e,other)<55)other.hp-=b.damage*.5;if(e.hp<=0)kill(e)}
+function hitEnemy(e,b){
+  e.hp-=b.damage;
+  if(b.weapon==='fire'){
+    const w=player.weapons.fire;
+    const radius=w?.evolved?90:55;
+    const splash=w?.evolved?b.damage*.8:b.damage*.5;
+    for(const other of enemies)if(!other.dead&&other!==e&&dist(e,other)<radius)other.hp-=splash;
+  }
+  if(e.hp<=0)kill(e);
+  for(const other of enemies)if(other!==e&&!other.dead&&other.hp<=0)kill(other);
+}
 function kill(e){e.dead=true;player.kills++;drops.push({x:e.x,y:e.y,r:6,type:'xp',v:e.elite?5:2});if(Math.random()<.14)drops.push({x:e.x+5,y:e.y+5,r:5,type:'gold',v:e.elite?5:1});for(let i=0;i<7;i++)particles.push({x:e.x,y:e.y,vx:(Math.random()-.5)*150,vy:(Math.random()-.5)*150,life:.35})}
 function gainXp(v){player.xp+=v*player.xpMul;while(player.xp>=player.next){player.xp-=player.next;player.level++;player.next=Math.floor(player.next*1.32);openLevelUp()}}
 function openLevelUp(){state='levelup';$('choices').innerHTML='';const opts=options();opts.forEach(o=>{const el=document.createElement('div');el.className='choice';el.innerHTML='<strong>'+o.title+'</strong><span>'+o.desc+'</span>';el.onclick=()=>{o.apply();hide('levelup');state='playing';last=performance.now();requestAnimationFrame(loop)};$('choices').appendChild(el)});show('levelup')}
-function options(){let arr=[];const ws=Object.entries(WEAPONS).filter(([id])=>!player.weapons[id]||player.weapons[id].level<5);for(const [id,w] of ws)if(!player.weapons[id])arr.push({title:'获得 '+w.name,desc:w.desc+' · 伤害 '+w.damage,apply:()=>player.weapons[id]={...w,level:1}});else arr.push({title:w.name+' 升级 Lv.'+(player.weapons[id].level+1),desc:'伤害 +25%，攻击频率提升',apply:()=>{let x=player.weapons[id];x.level++;x.damage*=1.25;x.rate*=.88;x.count=Math.min(5,x.count+(id==='magic'&&x.level%3===0?1:0));x.pierce=(x.pierce||0)+(id==='knife'&&x.level%2===0?1:0)}});for(const p of PASSIVES)if(!player.passives.includes(p[0]))arr.push({title:p[0],desc:p[1],apply:()=>{player.passives.push(p[0]);p[2](player)}});return arr.sort(()=>Math.random()-.5).slice(0,3)}
+function options(){
+  let arr=[];
+  const ws=Object.entries(WEAPONS).filter(([id])=>!player.weapons[id]||player.weapons[id].level<5);
+  for(const [id,w] of ws){
+    if(!player.weapons[id]){
+      arr.push({title:'获得 '+w.name,desc:w.desc+' · 伤害 '+w.damage,apply:()=>player.weapons[id]={...w,level:1}});
+    }else{
+      const x=player.weapons[id];
+      arr.push({title:w.name+' 升级 Lv.'+(x.level+1),desc:'伤害 +25%，攻击频率提升',apply:()=>{x.level++;x.damage*=1.25;x.rate*=.88;x.count=Math.min(5,x.count+(id==='magic'&&x.level%3===0?1:0));x.pierce=(x.pierce||0)+(id==='knife'&&x.level%2===0?1:0)}});
+    }
+  }
+  for(const [id,evo] of Object.entries(EVOLUTIONS)){
+    const x=player.weapons[id];
+    if(x&&x.level>=5&&!x.evolved)arr.push({title:'进化 · '+evo.name,desc:evo.desc,apply:()=>EVOLUTIONS[id].apply(x)});
+  }
+  for(const p of PASSIVES)if(!player.passives.includes(p[0]))arr.push({title:p[0],desc:p[1],apply:()=>{player.passives.push(p[0]);p[2](player)}});
+  return arr.sort(()=>Math.random()-.5).slice(0,3)
+}
 function spawnBoss(){boss={x:W/2,y:-80,r:42,maxHp:1800+elapsed*4,hp:1800+elapsed*4,speed:55,dmg:30,phase:1,shot:1};toast('BOSS 出现！坚持到击败它');}
 function updateBoss(dt){if(boss.dead)return;let a=Math.atan2(player.y-boss.y,player.x-boss.x);boss.x+=Math.cos(a)*boss.speed*dt;boss.y+=Math.sin(a)*boss.speed*dt;if(dist(boss,player)<boss.r+player.r){player.hp-=boss.dmg*dt;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}boss.shot-=dt;if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<boss.maxHp*.5)boss.phase=2}
 function end(){state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+player.gold+' · 生存 '+fmt(elapsed);show('result');saveCloud(false)}
