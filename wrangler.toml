@@ -1,3 +1,8 @@
 name = "roguegame"
 compatibility_date = "2026-09-22"
 pages_build_output_dir = "."
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hiruma"
+database_id = "d71aa51c-6f85-4034-b4dd-0ac32a217ce8"
