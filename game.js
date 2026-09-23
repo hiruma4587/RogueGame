@@ -24,8 +24,7 @@ joystickEl.addEventListener('pointermove',e=>{if(joystick.active&&e.pointerId===
 function releaseJoystick(e){if(e.pointerId!==joystick.id)return;joystick.active=false;joystick.id=null;joystick.x=joystick.y=0;stickEl.style.transform='translate(0,0)'}
 joystickEl.addEventListener('pointerup',releaseJoystick);joystickEl.addEventListener('pointercancel',releaseJoystick);
 canvas.addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});canvas.addEventListener('pointerdown',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
-function bindButton(id,fn){const el=$(id);if(!el)return;el.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();fn()},{passive:false})}
-bindButton('start',()=>start());bindButton('again',()=>start());bindButton('victoryAgain',()=>start());bindButton('continue',loadCloud);bindButton('save',()=>saveCloud(true));
+
 function fresh(){return{x:W/2,y:H/2,r:15,hp:100,maxHp:100,speed:230,damageMul:1,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
 function start(data){elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[]}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
 function hide(id){$(id).classList.add('hidden')}function show(id){$(id).classList.remove('hidden')}
