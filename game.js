@@ -37,7 +37,7 @@ joystickEl.addEventListener('pointermove',e=>{if(joystick.active&&e.pointerId===
 function releaseJoystick(e){if(e.pointerId!==joystick.id)return;joystick.active=false;joystick.id=null;joystick.x=joystick.y=0;stickEl.style.transform='translate(0,0)'}
 joystickEl.addEventListener('pointerup',releaseJoystick);joystickEl.addEventListener('pointercancel',releaseJoystick);
 
-function fresh(){return{x:W/2,y:H/2,r:15,hp:100+meta.upgrades.hp*10,maxHp:100+meta.upgrades.hp*10,speed:230*(1+meta.upgrades.speed*.05),damageMul:1+meta.upgrades.damage*.05,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,relics:[],weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
+function fresh(){return{x:W/2,y:H/2,r:15,hp:100+meta.upgrades.hp*10,maxHp:100+meta.upgrades.hp*10,speed:230*(1+meta.upgrades.speed*.05),damageMul:1+meta.upgrades.damage*.05,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,relics:[],synergyFI:false,synergyML:false,synergyKB:false,synergyHG:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
 function start(data){canvas.style.pointerEvents='none';if(matchMedia('(pointer: coarse)').matches)show('joystick');gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];chests=[];events=[];boss=null;nextChest=90;nextEvent=60;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.relics=data.relics||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
 function hide(id){const el=$(id);if(el)el.classList.add('hidden')}function show(id){const el=$(id);if(el)el.classList.remove('hidden')}
 function goHome(){state='menu';gameSpeed=1;updateSpeedButton();hide('result');hide('victory');hide('levelup');hide('metaPanel');hide('joystick');show('menu');canvas.style.pointerEvents='none';renderMeta()}
@@ -65,12 +65,12 @@ function update(dt){elapsed+=dt;spawn-=dt;
     if(e.type==='bomber'){
       e.dead=true;
       for(const o of enemies)if(o!==e&&!o.dead&&dist(o,e)<75)o.hp-=28;
-      player.hp-=e.dmg*(player.relics?.includes('guard')?.88:1);
+      player.hp-=e.dmg*(player.relics?.includes('guard')?.88:1)*(player.synergyHG?.9:1);
     }else{
-      player.hp-=e.dmg*dt*(player.relics?.includes('guard')?.88:1);
+      player.hp-=e.dmg*dt*(player.relics?.includes('guard')?.88:1)*(player.synergyHG?.9:1);
     }
 if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾抵挡了致命伤害')}else{end();return}}}}
- for(const b of bullets){b.age=(b.age||0)+dt;if(b.weapon)weaponFx(b);if(b.boomerang){b.age=(b.age||0)+dt;if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage*(player.relics?.includes('guard')?.88:1);if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&boss.spawned&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage*relicDamageMul(boss);if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.hp<=0){finishBoss();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
+ for(const b of bullets){b.age=(b.age||0)+dt;if(b.weapon)weaponFx(b);if(b.boomerang){b.age=(b.age||0)+dt;if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage*(player.relics?.includes('guard')?.88:1)*(player.synergyHG?.9:1);if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&boss.spawned&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage*relicDamageMul(boss);if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.hp<=0){finishBoss();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
  bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60);enemies=enemies.filter(e=>!e.dead);
  if(boss&&!boss.dead)updateBoss(dt);if(boss&&!boss.defeated&&boss.hp<=0){finishBoss();return;}
  for(const c of chests){c.life-=dt;if(!c.dead&&dist(c,player)<player.r+c.r+14)openChest(c)}chests=chests.filter(c=>!c.dead&&c.life>0);events=events.filter(e=>{e.life-=dt;return e.life>0});
@@ -161,7 +161,7 @@ function autoShoot(dt){
   }
 }
 function shootWeapon(id,w){
-  const damage=w.damage*player.damageMul*relicDamageMul(null)*(Math.random()<player.crit?2:1);
+  let damage=w.damage*player.damageMul*relicDamageMul(null)*(Math.random()<player.crit?2:1);if((id==='fire'||id==='ice')&&player.synergyFI)damage*=1.25;if((id==='lightning'||id==='magic')&&player.synergyML)damage*=id==='lightning'?1.2:1;if((id==='knife'||id==='boomerang')&&player.synergyKB)damage*=1.18;
   if(id==='lightning'){
     const targets=enemies.filter(e=>!e.dead).sort((a,b)=>dist(a,player)-dist(b,player)).slice(0,w.count||3);
     if(boss&&!boss.dead&&targets.length<(w.count||3))targets.push(boss);
@@ -213,6 +213,7 @@ const WEAPON_SYNERGIES={
  ice:{name:'寒霜汲取',desc:'冰霜弹升级同时：经验获取 +5%',apply:p=>p.xpMul*=1.05},
  holy:{name:'圣光生命',desc:'圣光升级同时：最大生命 +10，并回复 10 HP',apply:p=>{p.maxHp+=10;p.hp=Math.min(p.maxHp,p.hp+10)}},
 };
+function synergyChoices(){const ids=Object.keys(player.weapons);const out=[];if(ids.includes('fire')&&ids.includes('ice'))out.push(['冰火湮灭','火焰与冰霜共鸣：两种武器伤害 +25%，命中时额外造成一次范围爆裂',()=>{player.damageMul*=1.25;player.synergyFI=true}]);if(ids.includes('magic')&&ids.includes('lightning'))out.push(['奥术雷暴','魔法弹与闪电链共鸣：攻击速度 +15%，闪电额外伤害 +20%',()=>{player.rateMul*=.85;player.synergyML=true}]);if(ids.includes('knife')&&ids.includes('boomerang'))out.push(['刃舞','飞刀与回旋刃共鸣：移动速度 +10%，两种武器伤害 +18%',()=>{player.speed*=1.1;player.damageMul*=1.18;player.synergyKB=true}]);if(ids.includes('holy')&&player.relics?.includes('guard'))out.push(['圣壁','圣光与坚壁符文共鸣：受到伤害额外降低 10%',()=>player.synergyHG=true]);return out}
 function options(){
   let arr=[];
   const ws=Object.entries(WEAPONS).filter(([id])=>!player.weapons[id]||player.weapons[id].level<5);
