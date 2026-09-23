@@ -180,8 +180,10 @@ function updateBoss(dt){
     toast(boss.phase===1?'BOSS 释放冲击波！':'BOSS 释放强化冲击波！');
   }
   if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.speed=62;boss.dmg=42;toast('BOSS 进入第二阶段！')}}
-function bankRunGold(rate=1){if(player&&player.gold>0){const earned=Math.floor(player.gold*Math.max(0,Math.min(1,rate)));meta.gold+=earned;player.gold=0;return earned}return 0}
-function end(){const runGold=player.gold;const keptGold=bankRunGold(.5);state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+runGold+' · 本局保留 '+keptGold+' · 永久金币 '+meta.gold+' · 生存 '+fmt(elapsed);show('result');saveCloud(false)}
+function persistMeta(){try{localStorage.setItem('roguegame_meta',JSON.stringify(meta))}catch(e){}}
+function restoreLocalMeta(){try{const x=JSON.parse(localStorage.getItem('roguegame_meta')||'null');if(x&&typeof x==='object'){meta={gold:Number(x.gold||0),upgrades:{hp:Number(x.upgrades?.hp||0),damage:Number(x.upgrades?.damage||0),speed:Number(x.upgrades?.speed||0)}}}}catch(e){}}
+function bankRunGold(rate=1){if(player&&player.gold>0){const earned=Math.floor(player.gold*Math.max(0,Math.min(1,rate)));meta.gold+=earned;player.gold=0;persistMeta();return earned}return 0}
+async function end(){const runGold=player.gold;const keptGold=bankRunGold(.5);state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+runGold+' · 本局保留 '+keptGold+' · 永久金币 '+meta.gold+' · 生存 '+fmt(elapsed)+' · 正在保存…';show('result');const result=await saveCloud(false);$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+runGold+' · 本局保留 '+keptGold+' · 永久金币 '+meta.gold+' · '+(result.ok?'云存档已保存':'云存档保存失败：'+result.error)}
 async function victory(){
   if(!boss||!boss.spawned||!boss.defeated)return;
   const earned=player.gold+100;
@@ -262,10 +264,10 @@ async function saveCloud(manual){
   if(manual)toast('云存档不可用：'+lastError);
   return {ok:false,error:lastError};
 }
-async function loadCloud(){try{let r=await fetch('/api/save');if(!r.ok)throw Error();let d=await r.json();if(d.save){const savedMeta=d.save.meta||{};meta={gold:Number(savedMeta.gold??d.save.gold??0),upgrades:{hp:Number(savedMeta.upgrades?.hp||0),damage:Number(savedMeta.upgrades?.damage||0),speed:Number(savedMeta.upgrades?.speed||0)}};start(d.save.player);toast('已读取云存档 · 永久金币 '+meta.gold)}else toast('暂无云存档')}catch(e){toast('暂无可用云存档')}}
+async function loadCloud(){try{let r=await fetch('/api/save');if(!r.ok)throw Error();let d=await r.json();if(d.save){const savedMeta=d.save.meta||{};meta={gold:Number(savedMeta.gold??d.save.gold??0),upgrades:{hp:Number(savedMeta.upgrades?.hp||0),damage:Number(savedMeta.upgrades?.damage||0),speed:Number(savedMeta.upgrades?.speed||0)}};persistMeta();start(d.save.player);toast('已读取云存档 · 永久金币 '+meta.gold)}else toast('暂无云存档')}catch(e){toast('暂无可用云存档')}}
 function openMeta(){state='meta';hide('menu');hide('result');hide('victory');hide('levelup');renderMeta();show('metaPanel')}
 function closeMeta(){state='menu';hide('metaPanel');show('menu')}
-function renderMeta(){const box=$('metaChoices');if(!box)return;box.innerHTML='';$('metaGold').textContent=meta.gold;const items=[['hp','生命上限 +10',20],['damage','所有伤害 +5%',30],['speed','移动速度 +5%',25]];for(const [id,label,cost] of items){const lv=meta.upgrades[id];const el=document.createElement('button');el.className='choice';el.innerHTML='<strong>'+label+' · Lv.'+lv+'</strong><span>升级费用 '+cost+' 金币</span>';el.disabled=meta.gold<cost;el.onclick=()=>{if(meta.gold<cost)return;meta.gold-=cost;meta.upgrades[id]++;renderMeta();saveCloud(false);toast('永久强化已升级')};box.appendChild(el)}}
+function renderMeta(){persistMeta();const box=$('metaChoices');if(!box)return;box.innerHTML='';$('metaGold').textContent=meta.gold;const items=[['hp','生命上限 +10',20],['damage','所有伤害 +5%',30],['speed','移动速度 +5%',25]];for(const [id,label,cost] of items){const lv=meta.upgrades[id];const el=document.createElement('button');el.className='choice';el.innerHTML='<strong>'+label+' · Lv.'+lv+'</strong><span>升级费用 '+cost+' 金币</span>';el.disabled=meta.gold<cost;el.onclick=()=>{if(meta.gold<cost)return;meta.gold-=cost;meta.upgrades[id]++;persistMeta();renderMeta();saveCloud(false);toast('永久强化已升级')};box.appendChild(el)}}
 function toast(s){$('toast').textContent=s;$('toast').style.opacity=1;setTimeout(()=>$('toast').style.opacity=0,1600)}
 function toggleSpeed(){
   gameSpeed=gameSpeed===1?2:1;
@@ -277,6 +279,8 @@ function updateSpeedButton(){
   if(b)b.textContent=gameSpeed===2?'速度 ×2':'速度 ×1';
 }
 window.toggleSpeed=toggleSpeed;window.openMeta=openMeta;window.closeMeta=closeMeta;
+restoreLocalMeta();
+loadCloud();
 
 window.start=start;window.loadCloud=loadCloud;window.saveCloud=saveCloud;window.__RG_READY__=true;
 
