@@ -75,6 +75,7 @@ if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾
  if(boss&&!boss.dead)updateBoss(dt);if(boss&&!boss.defeated&&boss.hp<=0){finishBoss();return;}
  for(const c of chests){c.life-=dt;if(!c.dead&&dist(c,player)<player.r+c.r+14)openChest(c)}chests=chests.filter(c=>!c.dead&&c.life>0);events=events.filter(e=>{e.life-=dt;return e.life>0});
  for(const d of drops){let dd=dist(d,player);if(dd<player.magnet){let a=Math.atan2(player.y-d.y,player.x-d.x);d.x+=Math.cos(a)*220*dt;d.y+=Math.sin(a)*220*dt}if(dist(d,player)<player.r+d.r){if(d.type==='xp')gainXp(d.v);else if(d.type==='power'){const choices=['damage','rate','heal'];const type=choices[Math.floor(Math.random()*choices.length)];if(type==='damage')player.damageMul*=1.12;else if(type==='rate')player.rateMul*=.9;else player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.25);toast(type==='damage'?'强化核心：伤害 +12%':type==='rate'?'强化核心：攻击速度 +10%':'强化核心：恢复 25% 生命')}else if(d.type==='bomb'){for(const e of enemies){if(!e.dead&&dist(d,e)<110){e.hp-=d.v;if(e.hp<=0)kill(e)}}for(let i=0;i<24;i++)particles.push({x:d.x,y:d.y,vx:(Math.random()-.5)*300,vy:(Math.random()-.5)*300,life:.5});toast('爆裂核心：范围伤害')}else player.gold+=Math.ceil(d.v*(player.relics?.includes('greed')?1.25:1));d.dead=true}}drops=drops.filter(d=>!d.dead);
+ for(const ev of events){if(ev.type==='meteor'&&ev.life<=1.5&&!ev.done){ev.done=true;for(const e of enemies)if(!e.dead&&dist(e,ev)<80){e.hp-=70;if(e.hp<=0)kill(e)}if(dist(player,ev)<80){player.hp-=35;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}}if(ev.type==='shrine'&&!ev.used&&dist(player,ev)<35){ev.used=true;player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.35);player.xp+=player.next*.35;toast('祭坛：恢复生命并获得经验！')}}
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);ui()}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function eliteSkill(e){
@@ -97,7 +98,7 @@ function eliteSkill(e){
   }
 }
 function spawnEvent(){
-  const types=['frenzy','gold','regen'];
+  const types=['frenzy','gold','regen','meteor','shrine'];
   const type=types[Math.floor(Math.random()*types.length)];
   events.push({type,life:12});
   if(type==='frenzy'){
@@ -106,6 +107,13 @@ function spawnEvent(){
   }else if(type==='gold'){
     for(let i=0;i<8;i++){const a=i*Math.PI/4,r=100+Math.random()*100;drops.push({x:player.x+Math.cos(a)*r,y:player.y+Math.sin(a)*r,r:6,type:'gold',v:2});}
     toast('事件：金币雨！');
+  }else if(type==='meteor'){
+    events.push({type:'meteor',life:4});
+    for(let i=0;i<5;i++){const x=50+Math.random()*(W-100),y=70+Math.random()*(H-140);particles.push({x,y,vx:0,vy:0,life:2.5,meteor:true,radius:35+Math.random()*25})}
+    toast('事件：陨石即将坠落！');
+  }else if(type==='shrine'){
+    events.push({type:'shrine',life:18,x:W*.5+(Math.random()-.5)*260,y:H*.5+(Math.random()-.5)*180});
+    toast('事件：神秘祭坛出现！');
   }else{
     player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.25);
     toast('事件：生命恢复！');
@@ -294,6 +302,7 @@ function draw(){
     ctx.fillStyle=e.elite?'#c66cff':'#e85d75';
     ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,7);ctx.fill();
   }
+  for(const ev of events)if(ev.type==='shrine'&&!ev.used){ctx.save();ctx.translate(ev.x,ev.y);ctx.strokeStyle='#8fd8ff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,24+Math.sin(performance.now()/150)*3,0,7);ctx.stroke();ctx.fillStyle='#63a4ff';ctx.fillRect(-7,-7,14,14);ctx.restore()}
   if(boss){
     ctx.save();ctx.globalAlpha=boss.flash>0?.65:1;ctx.fillStyle=boss.phase===2?'#ff7b35':'#ff315c';
     ctx.beginPath();ctx.arc(boss.x,boss.y,boss.r,0,7);ctx.fill();ctx.restore();
@@ -301,7 +310,7 @@ function draw(){
   ctx.fillStyle='#70a1ff';
   ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,7);ctx.fill();
   for(const p of particles){
-    if(p.bossSkill){
+    if(p.meteor){ctx.globalAlpha=Math.max(0,p.life/2.5);ctx.strokeStyle='#ff8b4d';ctx.lineWidth=3;ctx.beginPath();ctx.arc(p.x,p.y,p.radius*(1-p.life/2.5),0,7);ctx.stroke();continue}if(p.bossSkill){
       ctx.globalAlpha=Math.max(0,p.life/.45);
       ctx.strokeStyle='#ff5577';ctx.lineWidth=4;ctx.beginPath();ctx.arc(p.x,p.y,p.radius*(1-p.life/.45),0,7);ctx.stroke();continue;
     }
