@@ -54,7 +54,45 @@ function end(){state='result';$('resultTitle').textContent='你倒下了';$('res
 function victory(){state='victory';player.gold+=100;saveCloud(false);$('victoryText').textContent='击败最终 Boss · 获得 100 金币 · 等级 '+player.level;show('victory')}
 function fmt(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
 function ui(){$('hp').textContent=Math.ceil(player.hp)+'/'+player.maxHp;$('level').textContent=player.level;$('gold').textContent=player.gold;$('time').textContent=fmt(elapsed);$('hpbar').style.width=Math.max(0,player.hp/player.maxHp*100)+'%';$('xpbar').style.width=Math.min(100,player.xp/player.next*100)+'%';$('weapon').textContent=Object.values(player.weapons).filter(Boolean).map(w=>w.name+' Lv.'+w.level).join(' · ');if(boss){$('bossbar').classList.remove('hidden');$('bossfill').style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%'}else $('bossbar').classList.add('hidden')}
-function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#0b0e14';ctx.fillRect(0,0,W,H);ctx.strokeStyle='#161c26';for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}for(const d of drops){ctx.fillStyle=d.type==='xp'?'#63a4ff':'#ffd45c';ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,7);ctx.fill()}for(const b of bullets){ctx.fillStyle=b.enemy?'#ff5577':(WEAPONS[b.weapon]?.color||'#ffe08a');ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,7);ctx.fill()}for(const e of enemies){ctx.fillStyle=e.elite?'#c66cff':'#e85d75';ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,7);ctx.fill();}if(boss){ctx.fillStyle='#ff315c';ctx.beginPath();ctx.arc(boss.x,boss.y,boss.r,0,7);ctx.fill()}ctx.fillStyle='#70a1ff';ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,7);ctx.fill();let a=Math.atan2(mouse.y-player.y,mouse.x-player.x);ctx.strokeStyle='#dbe7ff';ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(player.x+Math.cos(a)*25,player.y+Math.sin(a)*25);ctx.stroke();for(const p of particles){ctx.globalAlpha=Math.max(0,p.life/.35);ctx.fillStyle='#fff';ctx.fillRect(p.x,p.y,3,3)}ctx.globalAlpha=1}}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0b0e14';
+  ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#161c26';
+  for(let x=0;x<W;x+=40){
+    ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+  }
+  for(let y=0;y<H;y+=40){
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+  }
+  for(const d of drops){
+    ctx.fillStyle=d.type==='xp'?'#63a4ff':'#ffd45c';
+    ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,7);ctx.fill();
+  }
+  for(const b of bullets){
+    ctx.fillStyle=b.enemy?'#ff5577':(WEAPONS[b.weapon]?.color||'#ffe08a');
+    ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,7);ctx.fill();
+  }
+  for(const e of enemies){
+    ctx.fillStyle=e.elite?'#c66cff':'#e85d75';
+    ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,7);ctx.fill();
+  }
+  if(boss){
+    ctx.fillStyle='#ff315c';
+    ctx.beginPath();ctx.arc(boss.x,boss.y,boss.r,0,7);ctx.fill();
+  }
+  ctx.fillStyle='#70a1ff';
+  ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,7);ctx.fill();
+  const a=Math.atan2(mouse.y-player.y,mouse.x-player.x);
+  ctx.strokeStyle='#dbe7ff';
+  ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(player.x+Math.cos(a)*25,player.y+Math.sin(a)*25);ctx.stroke();
+  for(const p of particles){
+    ctx.globalAlpha=Math.max(0,p.life/.35);
+    ctx.fillStyle='#fff';
+    ctx.fillRect(p.x,p.y,3,3);
+  }
+  ctx.globalAlpha=1;
+}
 async function saveCloud(manual){try{let r=await fetch('/api/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({player,elapsed})});if(!r.ok)throw Error();if(manual)toast('云存档已保存')}catch(e){if(manual)toast('云存档不可用')}}
 async function loadCloud(){try{let r=await fetch('/api/save');if(!r.ok)throw Error();let d=await r.json();if(d.save){start(d.save.player);toast('已读取云存档')}else toast('暂无云存档')}catch(e){toast('暂无可用云存档')}}
 function toast(s){$('toast').textContent=s;$('toast').style.opacity=1;setTimeout(()=>$('toast').style.opacity=0,1600)}
