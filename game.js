@@ -1,5 +1,5 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
-let W,H,dpr,state='menu',gameSpeed=1,player,enemies=[],bullets=[],drops=[],particles=[],keys={},mouse={x:0,y:0},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0;
+let W,H,dpr,state='menu',gameSpeed=1,meta={gold:0,upgrades:{hp:0,damage:0,speed:0}},player,enemies=[],bullets=[],drops=[],particles=[],keys={},mouse={x:0,y:0},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0;
 const WEAPONS={
   magic:{name:'魔法弹',desc:'自动追踪最近敌人',level:1,damage:18,rate:.45,count:1,speed:600,life:1.2,pierce:0,color:'#ffe08a'},
   knife:{name:'飞刀',desc:'高速穿透敌人',level:0,damage:12,rate:.7,count:1,speed:720,life:1.3,pierce:1,color:'#b8e1ff'},
@@ -38,8 +38,8 @@ function releaseJoystick(e){if(e.pointerId!==joystick.id)return;joystick.active=
 joystickEl.addEventListener('pointerup',releaseJoystick);joystickEl.addEventListener('pointercancel',releaseJoystick);
 canvas.addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});canvas.addEventListener('pointerdown',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
 
-function fresh(){return{x:W/2,y:H/2,r:15,hp:100,maxHp:100,speed:230,damageMul:1,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
-function start(data){canvas.style.pointerEvents='auto';gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[]}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
+function fresh(){return{x:W/2,y:H/2,r:15,hp:100+meta.upgrades.hp*10,maxHp:100+meta.upgrades.hp*10,speed:230*(1+meta.upgrades.speed*.05),damageMul:1+meta.upgrades.damage*.05,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
+function start(data){canvas.style.pointerEvents='auto';gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
 function hide(id){$(id).classList.add('hidden')}function show(id){$(id).classList.remove('hidden')}
 function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000)*gameSpeed;last=t;update(dt);draw();requestAnimationFrame(loop)}
 function update(dt){elapsed+=dt;spawn-=dt;
@@ -180,11 +180,13 @@ function updateBoss(dt){
     toast(boss.phase===1?'BOSS 释放冲击波！':'BOSS 释放强化冲击波！');
   }
   if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.speed=62;boss.dmg=42;toast('BOSS 进入第二阶段！')}}
-function end(){state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+player.gold+' · 生存 '+fmt(elapsed);show('result');saveCloud(false)}
+function bankRunGold(){if(player&&player.gold>0){meta.gold+=player.gold;player.gold=0}}
+function end(){bankRunGold();state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+player.gold+' · 生存 '+fmt(elapsed);show('result');saveCloud(false)}
 function victory(){
   if(!boss||!boss.spawned||!boss.defeated)return;
   state='victory';
   player.gold+=100;
+  bankRunGold();
   saveCloud(false);
   $('victoryText').textContent='最终 Boss 已击败！本局通关 · 获得 100 金币 · 等级 '+player.level+' · 击杀 '+player.kills;
   show('victory');
@@ -234,9 +236,9 @@ function draw(){
   }
   ctx.globalAlpha=1;
 }
-async function saveCloud(manual){try{let r=await fetch('/api/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({player,elapsed})});if(!r.ok)throw Error();if(manual)toast('云存档已保存')}catch(e){if(manual)toast('云存档不可用')}}
-async function loadCloud(){try{let r=await fetch('/api/save');if(!r.ok)throw Error();let d=await r.json();if(d.save){start(d.save.player);toast('已读取云存档')}else toast('暂无云存档')}catch(e){toast('暂无可用云存档')}}
-function toast(s){$('toast').textContent=s;$('toast').style.opacity=1;setTimeout(()=>$('toast').style.opacity=0,1600)}
+async function saveCloud(manual){try{let r=await fetch('/api/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({player,elapsed,meta})});if(!r.ok)throw Error();if(manual)toast('云存档已保存')}catch(e){if(manual)toast('云存档不可用')}}
+async function loadCloud(){try{let r=await fetch('/api/save');if(!r.ok)throw Error();let d=await r.json();if(d.save){meta=d.save.meta||meta;start(d.save.player);toast('已读取云存档')}else toast('暂无云存档')}catch(e){toast('暂无可用云存档')}}
+function openMeta(){state='meta';hide('menu');hide('result');hide('victory');hide('levelup');renderMeta();show('meta')}\nfunction closeMeta(){state='menu';hide('meta');show('menu')}\nfunction renderMeta(){const box=$('metaChoices');if(!box)return;box.innerHTML='';$('metaGold').textContent=meta.gold;const items=[['hp','生命上限 +10',20],['damage','所有伤害 +5%',30],['speed','移动速度 +5%',25]];for(const [id,label,cost] of items){const lv=meta.upgrades[id];const el=document.createElement('button');el.className='choice';el.innerHTML='<strong>'+label+' · Lv.'+lv+'</strong><span>升级费用 '+cost+' 金币</span>';el.disabled=meta.gold<cost;el.onclick=()=>{if(meta.gold<cost)return;meta.gold-=cost;meta.upgrades[id]++;renderMeta();saveCloud(false);toast('永久强化已升级')};box.appendChild(el)}}\nfunction toast(s){$('toast').textContent=s;$('toast').style.opacity=1;setTimeout(()=>$('toast').style.opacity=0,1600)}
 function toggleSpeed(){
   gameSpeed=gameSpeed===1?2:1;
   updateSpeedButton();
@@ -246,7 +248,7 @@ function updateSpeedButton(){
   const b=$('speed');
   if(b)b.textContent=gameSpeed===2?'速度 ×2':'速度 ×1';
 }
-window.toggleSpeed=toggleSpeed;
+window.toggleSpeed=toggleSpeed;window.openMeta=openMeta;window.closeMeta=closeMeta;
 
 window.start=start;window.loadCloud=loadCloud;window.saveCloud=saveCloud;window.__RG_READY__=true;
 
@@ -259,7 +261,7 @@ window.start=start;window.loadCloud=loadCloud;window.saveCloud=saveCloud;window.
     const id=b.id;
     if(id==='start'||id==='again'||id==='victoryAgain') window.start();
     else if(id==='continue') window.loadCloud();
-    else if(id==='save') window.saveCloud(true);
+    else if(id==='save') window.saveCloud(true);\n    else if(id==='meta') window.openMeta();\n    else if(id==='metaClose') window.closeMeta();
     else if(id==='speed') window.toggleSpeed();
   },true);
 })();
