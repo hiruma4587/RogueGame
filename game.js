@@ -70,7 +70,7 @@ function update(dt){elapsed+=dt;spawn-=dt;
       player.hp-=e.dmg*dt*(player.relics?.includes('guard')?.88:1);
     }
 if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾抵挡了致命伤害')}else{end();return}}}}
- for(const b of bullets){b.age=(b.age||0)+dt;if(b.weapon)weaponFx(b);if(b.boomerang){b.age=(b.age||0)+dt;if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage*(player.relics?.includes('guard')?.88:1);if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage*relicDamageMul(boss);if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.spawned&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
+ for(const b of bullets){b.age=(b.age||0)+dt;if(b.weapon)weaponFx(b);if(b.boomerang){b.age=(b.age||0)+dt;if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage*(player.relics?.includes('guard')?.88:1);if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&boss.spawned&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage*relicDamageMul(boss);if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.hp<=0){finishBoss();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
  bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60);enemies=enemies.filter(e=>!e.dead);
  if(boss&&!boss.dead)updateBoss(dt);if(boss&&!boss.defeated&&boss.hp<=0){finishBoss();return;}
  for(const c of chests){c.life-=dt;if(!c.dead&&dist(c,player)<player.r+c.r+14)openChest(c)}chests=chests.filter(c=>!c.dead&&c.life>0);events=events.filter(e=>{e.life-=dt;return e.life>0});
@@ -127,7 +127,7 @@ function spawnChest(){
 function openChest(c){
   if(c.dead)return;
   c.dead=true;
-  const gold=12+Math.floor(Math.random()*14);
+  const gold=Math.ceil((12+Math.floor(Math.random()*14))*(player.relics?.includes('greed')?1.25:1));
   const heal=Math.floor(player.maxHp*.18);
   player.gold+=gold;
   player.hp=Math.min(player.maxHp,player.hp+heal);
@@ -166,13 +166,13 @@ function shootWeapon(id,w){
     const targets=enemies.filter(e=>!e.dead).sort((a,b)=>dist(a,player)-dist(b,player)).slice(0,w.count||3);
     if(boss&&!boss.dead&&targets.length<(w.count||3))targets.push(boss);
     for(const t of targets){t.hp-=damage;particles.push({x:t.x,y:t.y,vx:0,vy:0,life:.45,lightning:true});if(t!==boss&&t.hp<=0)kill(t)}
-    if(boss&&!boss.dead&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}
+    if(boss&&!boss.dead&&boss.spawned&&boss.hp<=0){finishBoss();return}
     return;
   }
   if(id==='holy'){
     const radius=w.evolved?180:115;
     for(const e of enemies)if(!e.dead&&dist(e,player)<radius){e.hp-=damage;if(e.hp<=0)kill(e)}
-    if(boss&&!boss.dead&&dist(boss,player)<radius){boss.hp-=damage*relicDamageMul(boss);if(boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}}
+    if(boss&&!boss.dead&&boss.spawned&&dist(boss,player)<radius){boss.hp-=damage*relicDamageMul(boss);if(boss.hp<=0){finishBoss();return}}
     for(let i=0;i<12;i++)particles.push({x:player.x+(Math.random()-.5)*radius*2,y:player.y+(Math.random()-.5)*radius*2,vx:0,vy:0,life:.35,holy:true});
     return;
   }
@@ -251,6 +251,7 @@ function updateBoss(dt){
     particles.push({x:boss.x,y:boss.y,vx:0,vy:0,life:.45,bossSkill:true,radius});
     toast(boss.phase===1?'BOSS 释放冲击波！':'BOSS 释放强化冲击波！');
   }
+  boss.flash=Math.max(0,(boss.flash||0)-dt);
   if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<=0){boss.hp=0;boss.dead=true;boss.defeated=true;particles.push({x:boss.x,y:boss.y,vx:0,vy:0,life:1.5,bossSkill:true,radius:boss.r*3});toast('BOSS 已击败！');victory();return}if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.speed=62;boss.dmg=42;toast('BOSS 进入第二阶段！')}}
 function persistMeta(){try{localStorage.setItem('roguegame_meta',JSON.stringify(meta))}catch(e){}}
 function restoreLocalMeta(){try{const x=JSON.parse(localStorage.getItem('roguegame_meta')||'null');if(x&&typeof x==='object'){meta={gold:Number(x.gold||0),upgrades:{hp:Number(x.upgrades?.hp||0),damage:Number(x.upgrades?.damage||0),speed:Number(x.upgrades?.speed||0)}}}}catch(e){}}
