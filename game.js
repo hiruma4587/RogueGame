@@ -157,8 +157,29 @@ function options(){
   for(const p of PASSIVES)if(!player.passives.includes(p[0]))arr.push({title:p[0],desc:p[1],apply:()=>{player.passives.push(p[0]);p[2](player)}});
   return arr.sort(()=>Math.random()-.5).slice(0,3)
 }
-function spawnBoss(){boss={x:W/2,y:-80,r:42,maxHp:15000+elapsed*12,hp:15000+elapsed*12,speed:42,dmg:30,phase:1,shot:1,spawned:true,defeated:false};toast('BOSS 出现！坚持到击败它');}
-function updateBoss(dt){if(boss.dead)return;let a=Math.atan2(player.y-boss.y,player.x-boss.x);boss.x+=Math.cos(a)*boss.speed*dt;boss.y+=Math.sin(a)*boss.speed*dt;if(dist(boss,player)<boss.r+player.r){player.hp-=boss.dmg*dt;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}boss.shot-=dt;if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.speed=62;boss.dmg=42;toast('BOSS 进入第二阶段！')}}
+function spawnBoss(){
+  boss={x:W/2,y:-90,r:42,maxHp:15000+elapsed*12,hp:15000+elapsed*12,speed:42,dmg:30,phase:1,shot:1,spawned:false,defeated:false,intro:2.5,skill:4,flash:0};
+  toast('BOSS 即将出现！');
+}
+function updateBoss(dt){
+  if(boss.dead)return;
+  if(!boss.spawned){
+    boss.intro-=dt;
+    boss.y=Math.min(H*.28,boss.y+150*dt);
+    if(boss.intro<=0){boss.spawned=true;boss.shot=1;toast('BOSS 出现！坚持到击败它')}
+    return;
+  }
+  let a=Math.atan2(player.y-boss.y,player.x-boss.x);boss.x+=Math.cos(a)*boss.speed*dt;boss.y+=Math.sin(a)*boss.speed*dt;if(dist(boss,player)<boss.r+player.r){player.hp-=boss.dmg*dt;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}boss.shot-=dt;
+  boss.skill-=dt;
+  if(boss.skill<=0){
+    boss.skill=boss.phase===1?6:4;
+    boss.flash=.35;
+    const radius=boss.phase===1?120:170;
+    for(const e of enemies)if(!e.dead&&dist(e,boss)<radius)e.hp-=boss.phase===1?25:45;
+    particles.push({x:boss.x,y:boss.y,vx:0,vy:0,life:.45,bossSkill:true,radius});
+    toast(boss.phase===1?'BOSS 释放冲击波！':'BOSS 释放强化冲击波！');
+  }
+  if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.speed=62;boss.dmg=42;toast('BOSS 进入第二阶段！')}}
 function end(){state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+player.gold+' · 生存 '+fmt(elapsed);show('result');saveCloud(false)}
 function victory(){
   if(!boss||!boss.spawned||!boss.defeated)return;
@@ -203,6 +224,10 @@ function draw(){
   ctx.strokeStyle='#dbe7ff';
   ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(player.x+Math.cos(a)*25,player.y+Math.sin(a)*25);ctx.stroke();
   for(const p of particles){
+    if(p.bossSkill){
+      ctx.globalAlpha=Math.max(0,p.life/.45);
+      ctx.strokeStyle='#ff5577';ctx.lineWidth=4;ctx.beginPath();ctx.arc(p.x,p.y,p.radius*(1-p.life/.45),0,7);ctx.stroke();continue;
+    }
     ctx.globalAlpha=Math.max(0,p.life/.35);
     ctx.fillStyle='#fff';
     ctx.fillRect(p.x,p.y,3,3);
