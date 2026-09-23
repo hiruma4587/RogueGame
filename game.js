@@ -116,7 +116,10 @@ function shootWeapon(id,w){
   }
   let t=boss&&!boss.dead?boss:nearest();if(!t)return;
   let base=Math.atan2(t.y-player.y,t.x-player.x),count=w.count||1;
-  for(let i=0;i<count;i++){let spread=(i-(count-1)/2)*.14;bullets.push({x:player.x,y:player.y,a:base+spread,speed:w.speed,r:id==='fire'?8:5,damage,life:w.life,pierce:w.pierce||0,weapon:id,hit:[],boomerang:id==='boomerang',age:0,maxLife:w.life,startX:player.x,startY:player.y})}
+  for(let i=0;i<count;i++){
+    let spread=count===1?0:(i-(count-1)/2)*.09;
+    bullets.push({x:player.x,y:player.y,a:base+spread,speed:w.speed,r:id==='fire'?8:5,damage,life:w.life,pierce:w.pierce||0,weapon:id,hit:[],boomerang:id==='boomerang',age:0,maxLife:w.life,startX:player.x,startY:player.y})
+  }
 }
 function hitEnemy(e,b){
   e.hp-=b.damage;
