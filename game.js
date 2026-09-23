@@ -49,7 +49,8 @@ function update(dt){elapsed+=dt;spawn-=dt;
  if(elapsed>=nextEvent&&!boss){spawnEvent();nextEvent+=120}
  if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);spawnEnemy()}autoShoot(dt);
  for(const e of enemies){
-  let a=Math.atan2(player.y-e.y,player.x-e.x),slow=e.slowTimer>0?(e.slow||.55):1;
+  let a=Math.atan2(player.y-e.y,player.x-e.x),slow=e.slowTimer>0?(e.slow||.55):1;if(e.boostTimer>0){slow*=e.boost||1.6;e.boostTimer-=dt}if(e.shieldTimer>0)e.shieldTimer-=dt;
+  if(e.elite){e.skill=(e.skill||5)-dt;if(e.skill<=0){e.skill=5+Math.random()*2;eliteSkill(e)}}
   if(e.type==='ranged'){
     const d=dist(e,player);
     if(d>260){e.x+=Math.cos(a)*e.speed*slow*dt;e.y+=Math.sin(a)*e.speed*slow*dt}
@@ -76,6 +77,25 @@ if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾
  for(const d of drops){let dd=dist(d,player);if(dd<player.magnet){let a=Math.atan2(player.y-d.y,player.x-d.x);d.x+=Math.cos(a)*220*dt;d.y+=Math.sin(a)*220*dt}if(dist(d,player)<player.r+d.r){if(d.type==='xp')gainXp(d.v);else player.gold+=d.v;d.dead=true}}drops=drops.filter(d=>!d.dead);
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);ui()}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function eliteSkill(e){
+  const type=e.type||'normal';
+  if(type==='swift'){
+    e.boost=1.6;e.boostTimer=2;
+    toast('精英疾行者发动冲刺！');
+  }else if(type==='ranged'){
+    for(let i=0;i<8;i++){const a=i*Math.PI/4;bullets.push({x:e.x,y:e.y,a,speed:190,r:5,damage:15,life:1.8,pierce:0,enemy:true})}
+    toast('精英远程怪释放弹幕！');
+  }else if(type==='tank'){
+    e.shieldTimer=2;e.shield=0.45;
+    toast('精英重甲怪进入防御！');
+  }else if(type==='bomber'){
+    e.speed*=1.35;e.dmg*=1.25;
+    toast('精英爆破怪狂暴！');
+  }else{
+    for(let i=0;i<3;i++){const a=Math.random()*Math.PI*2;particles.push({x:e.x,y:e.y,vx:Math.cos(a)*140,vy:Math.sin(a)*140,life:.5})}
+    e.hp=Math.min(e.maxHp,e.hp+e.maxHp*.12);
+  }
+}
 function spawnEvent(){
   const types=['frenzy','gold','regen'];
   const type=types[Math.floor(Math.random()*types.length)];
@@ -157,7 +177,7 @@ function shootWeapon(id,w){
   }
 }
 function hitEnemy(e,b){
-  e.hp-=b.damage;
+  e.hp-=b.damage*(e.shieldTimer>0?(1-(e.shield||.45)):1);
   if(b.weapon==='ice'){e.slow=.45;e.slowTimer=2.5;}
   if(b.weapon==='fire'){
     const w=player.weapons.fire;
