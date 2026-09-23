@@ -1,5 +1,5 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
-let W,H,dpr,state='menu',player,enemies=[],bullets=[],drops=[],particles=[],keys={},mouse={x:0,y:0},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0;
+let W,H,dpr,state='menu',gameSpeed=1,player,enemies=[],bullets=[],drops=[],particles=[],keys={},mouse={x:0,y:0},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0;
 const WEAPONS={
   magic:{name:'魔法弹',desc:'自动追踪最近敌人',level:1,damage:18,rate:.45,count:1,speed:600,life:1.2,pierce:0,color:'#ffe08a'},
   knife:{name:'飞刀',desc:'高速穿透敌人',level:0,damage:12,rate:.7,count:1,speed:720,life:1.3,pierce:1,color:'#b8e1ff'},
@@ -31,9 +31,9 @@ joystickEl.addEventListener('pointerup',releaseJoystick);joystickEl.addEventList
 canvas.addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});canvas.addEventListener('pointerdown',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
 
 function fresh(){return{x:W/2,y:H/2,r:15,hp:100,maxHp:100,speed:230,damageMul:1,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
-function start(data){canvas.style.pointerEvents='auto';elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[]}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
+function start(data){canvas.style.pointerEvents='auto';gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[]}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
 function hide(id){$(id).classList.add('hidden')}function show(id){$(id).classList.remove('hidden')}
-function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000);last=t;update(dt);draw();requestAnimationFrame(loop)}
+function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000)*gameSpeed;last=t;update(dt);draw();requestAnimationFrame(loop)}
 function update(dt){elapsed+=dt;spawn-=dt;
  let dx=(keys.d?1:0)-(keys.a?1:0),dy=(keys.s?1:0)-(keys.w?1:0);if(joystick.active){dx+=joystick.x;dy+=joystick.y}let l=Math.hypot(dx,dy)||1;if(dx||dy){player.x=Math.max(20,Math.min(W-20,player.x+dx/l*player.speed*dt));player.y=Math.max(20,Math.min(H-20,player.y+dy/l*player.speed*dt))}
  if(elapsed>=300&&!boss){spawnBoss();}if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);spawnEnemy()}autoShoot();
@@ -141,6 +141,16 @@ function draw(){
 async function saveCloud(manual){try{let r=await fetch('/api/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({player,elapsed})});if(!r.ok)throw Error();if(manual)toast('云存档已保存')}catch(e){if(manual)toast('云存档不可用')}}
 async function loadCloud(){try{let r=await fetch('/api/save');if(!r.ok)throw Error();let d=await r.json();if(d.save){start(d.save.player);toast('已读取云存档')}else toast('暂无云存档')}catch(e){toast('暂无可用云存档')}}
 function toast(s){$('toast').textContent=s;$('toast').style.opacity=1;setTimeout(()=>$('toast').style.opacity=0,1600)}
+function toggleSpeed(){
+  gameSpeed=gameSpeed===1?2:1;
+  updateSpeedButton();
+  toast(gameSpeed===2?'游戏速度 ×2':'游戏速度 ×1');
+}
+function updateSpeedButton(){
+  const b=$('speed');
+  if(b)b.textContent=gameSpeed===2?'速度 ×2':'速度 ×1';
+}
+window.toggleSpeed=toggleSpeed;
 
 window.start=start;window.loadCloud=loadCloud;window.saveCloud=saveCloud;window.__RG_READY__=true;
 
