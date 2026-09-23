@@ -1,5 +1,5 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
-let W,H,dpr,state='menu',gameSpeed=1,meta={gold:0,upgrades:{hp:0,damage:0,speed:0}},player,enemies=[],bullets=[],drops=[],particles=[],keys={},mouse={x:0,y:0},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0;
+let W,H,dpr,state='menu',gameSpeed=1,meta={gold:0,upgrades:{hp:0,damage:0,speed:0}},player,enemies=[],bullets=[],drops=[],particles=[],keys={},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0;
 const WEAPONS={
   magic:{name:'魔法弹',desc:'自动追踪最近敌人',level:1,damage:18,rate:.45,count:1,speed:600,life:1.2,pierce:0,color:'#ffe08a'},
   knife:{name:'飞刀',desc:'高速穿透敌人',level:0,damage:12,rate:.7,count:1,speed:720,life:1.3,pierce:1,color:'#b8e1ff'},
@@ -36,10 +36,9 @@ joystickEl.addEventListener('pointerdown',e=>{e.preventDefault();joystick.active
 joystickEl.addEventListener('pointermove',e=>{if(joystick.active&&e.pointerId===joystick.id)setJoystick(e)});
 function releaseJoystick(e){if(e.pointerId!==joystick.id)return;joystick.active=false;joystick.id=null;joystick.x=joystick.y=0;stickEl.style.transform='translate(0,0)'}
 joystickEl.addEventListener('pointerup',releaseJoystick);joystickEl.addEventListener('pointercancel',releaseJoystick);
-canvas.addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});canvas.addEventListener('pointerdown',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
 
 function fresh(){return{x:W/2,y:H/2,r:15,hp:100+meta.upgrades.hp*10,maxHp:100+meta.upgrades.hp*10,speed:230*(1+meta.upgrades.speed*.05),damageMul:1+meta.upgrades.damage*.05,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
-function start(data){canvas.style.pointerEvents='auto';gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
+function start(data){canvas.style.pointerEvents='none';if(matchMedia('(pointer: coarse)').matches)show('joystick');gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
 function hide(id){const el=$(id);if(el)el.classList.add('hidden')}function show(id){const el=$(id);if(el)el.classList.remove('hidden')}
 function goHome(){state='menu';gameSpeed=1;updateSpeedButton();hide('result');hide('victory');hide('levelup');hide('metaPanel');hide('joystick');show('menu');canvas.style.pointerEvents='none';renderMeta()}
 function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000)*gameSpeed;last=t;update(dt);draw();requestAnimationFrame(loop)}
@@ -229,9 +228,6 @@ function draw(){
   }
   ctx.fillStyle='#70a1ff';
   ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,7);ctx.fill();
-  const a=Math.atan2(mouse.y-player.y,mouse.x-player.x);
-  ctx.strokeStyle='#dbe7ff';
-  ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(player.x+Math.cos(a)*25,player.y+Math.sin(a)*25);ctx.stroke();
   for(const p of particles){
     if(p.bossSkill){
       ctx.globalAlpha=Math.max(0,p.life/.45);
