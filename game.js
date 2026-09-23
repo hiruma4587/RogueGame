@@ -75,7 +75,7 @@ if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾
  if(boss&&!boss.dead)updateBoss(dt);if(boss&&!boss.defeated&&boss.hp<=0){finishBoss();return;}
  for(const c of chests){c.life-=dt;if(!c.dead&&dist(c,player)<player.r+c.r+14)openChest(c)}chests=chests.filter(c=>!c.dead&&c.life>0);events=events.filter(e=>{e.life-=dt;return e.life>0});
  for(const d of drops){let dd=dist(d,player);if(dd<player.magnet){let a=Math.atan2(player.y-d.y,player.x-d.x);d.x+=Math.cos(a)*220*dt;d.y+=Math.sin(a)*220*dt}if(dist(d,player)<player.r+d.r){if(d.type==='xp')gainXp(d.v);else if(d.type==='power'){const choices=['damage','rate','heal'];const type=choices[Math.floor(Math.random()*choices.length)];if(type==='damage')player.damageMul*=1.12;else if(type==='rate')player.rateMul*=.9;else player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.25);toast(type==='damage'?'强化核心：伤害 +12%':type==='rate'?'强化核心：攻击速度 +10%':'强化核心：恢复 25% 生命')}else if(d.type==='bomb'){for(const e of enemies){if(!e.dead&&dist(d,e)<110){e.hp-=d.v;if(e.hp<=0)kill(e)}}for(let i=0;i<24;i++)particles.push({x:d.x,y:d.y,vx:(Math.random()-.5)*300,vy:(Math.random()-.5)*300,life:.5});toast('爆裂核心：范围伤害')}else player.gold+=Math.ceil(d.v*(player.relics?.includes('greed')?1.25:1));d.dead=true}}drops=drops.filter(d=>!d.dead);
- for(const ev of events){if(ev.type==='meteor'&&ev.life<=1.5&&!ev.done){ev.done=true;for(const e of enemies)if(!e.dead&&dist(e,ev)<80){e.hp-=70;if(e.hp<=0)kill(e)}if(dist(player,ev)<80){player.hp-=35;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}}if(ev.type==='shrine'&&!ev.used&&dist(player,ev)<35){ev.used=true;player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.35);player.xp+=player.next*.35;toast('祭坛：恢复生命并获得经验！')}}
+ for(const ev of events){if(ev.type==='meteor'&&ev.life<=1.5&&ev.points){for(const pt of ev.points)if(!pt.done){pt.done=true;for(const e of enemies)if(!e.dead&&dist(e,pt)<80){e.hp-=70;if(e.hp<=0)kill(e)}if(dist(player,pt)<80){player.hp-=35;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}}}if(ev.type==='shrine'&&!ev.used&&dist(player,ev)<35){ev.used=true;player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.35);player.xp+=player.next*.35;toast('祭坛：恢复生命并获得经验！')}}
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);ui()}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function eliteSkill(e){
@@ -100,7 +100,7 @@ function eliteSkill(e){
 function spawnEvent(){
   const types=['frenzy','gold','regen','meteor','shrine'];
   const type=types[Math.floor(Math.random()*types.length)];
-  events.push({type,life:12});
+  events.push({type,life:type==='meteor'?4:type==='shrine'?18:12});
   if(type==='frenzy'){
     for(let i=0;i<Math.min(8,3+Math.floor(elapsed/60));i++)spawnEnemy();
     toast('事件：敌群来袭！');
@@ -108,11 +108,10 @@ function spawnEvent(){
     for(let i=0;i<8;i++){const a=i*Math.PI/4,r=100+Math.random()*100;drops.push({x:player.x+Math.cos(a)*r,y:player.y+Math.sin(a)*r,r:6,type:'gold',v:2});}
     toast('事件：金币雨！');
   }else if(type==='meteor'){
-    events.push({type:'meteor',life:4});
-    for(let i=0;i<5;i++){const x=50+Math.random()*(W-100),y=70+Math.random()*(H-140);particles.push({x,y,vx:0,vy:0,life:2.5,meteor:true,radius:35+Math.random()*25})}
+    const ev=events[events.length-1];ev.points=[];for(let i=0;i<5;i++){const x=50+Math.random()*(W-100),y=70+Math.random()*(H-140);ev.points.push({x,y,done:false});particles.push({x,y,vx:0,vy:0,life:2.5,meteor:true,radius:35+Math.random()*25})}
     toast('事件：陨石即将坠落！');
   }else if(type==='shrine'){
-    events.push({type:'shrine',life:18,x:W*.5+(Math.random()-.5)*260,y:H*.5+(Math.random()-.5)*180});
+    const ev=events[events.length-1];ev.x=W*.5+(Math.random()-.5)*260;ev.y=H*.5+(Math.random()-.5)*180;ev.used=false;
     toast('事件：神秘祭坛出现！');
   }else{
     player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.25);
