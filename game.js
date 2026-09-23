@@ -1,5 +1,6 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
-let W,H,dpr,state='menu',gameSpeed=1,bossRewards=[],relics=[],meta={gold:0,upgrades:{hp:0,damage:0,speed:0}},player,enemies=[],bullets=[],drops=[],particles=[],chests=[],events=[],keys={},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0,nextChest=90,nextEvent=60;
+let W,H,dpr,state='menu',gameSpeed=1,bossRewards=[],relics=[],meta={gold:0,upgrades:{hp:0,damage:0,speed:0}},player,enemies=[],bullets=[],drops=[],particles=[],chests=[],events=[],keys={},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0,nextChest=90,nextEvent=60,loopStage='boot',runtimeErrorShown=false;
+const MAX_ENEMIES=180,MAX_BULLETS=360,MAX_PARTICLES=700;
 const WEAPONS={
   magic:{name:'魔法弹',desc:'自动追踪最近敌人',level:1,damage:18,rate:.45,count:1,speed:600,life:1.2,pierce:0,color:'#ffe08a'},
   knife:{name:'飞刀',desc:'高速穿透敌人',level:0,damage:12,rate:.7,count:1,speed:720,life:1.3,pierce:1,color:'#b8e1ff'},
@@ -38,16 +39,17 @@ function releaseJoystick(e){if(e.pointerId!==joystick.id)return;joystick.active=
 joystickEl.addEventListener('pointerup',releaseJoystick);joystickEl.addEventListener('pointercancel',releaseJoystick);
 
 function fresh(){return{x:W/2,y:H/2,r:15,hp:100+meta.upgrades.hp*10,maxHp:100+meta.upgrades.hp*10,speed:230*(1+meta.upgrades.speed*.05),damageMul:1+meta.upgrades.damage*.05,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,relics:[],synergyFI:false,synergyML:false,synergyKB:false,synergyHG:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
-function start(data){canvas.style.pointerEvents='none';if(matchMedia('(pointer: coarse)').matches)show('joystick');gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];chests=[];events=[];boss=null;nextChest=90;nextEvent=60;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.relics=data.relics||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
+function start(data){runtimeErrorShown=false;const old=$('runtimeError');if(old)old.remove();canvas.style.pointerEvents='none';if(matchMedia('(pointer: coarse)').matches)show('joystick');gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];chests=[];events=[];boss=null;nextChest=90;nextEvent=60;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.relics=data.relics||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
 function hide(id){const el=$(id);if(el)el.classList.add('hidden')}function show(id){const el=$(id);if(el)el.classList.remove('hidden')}
 function goHome(){state='menu';gameSpeed=1;updateSpeedButton();hide('result');hide('victory');hide('levelup');hide('metaPanel');hide('joystick');show('menu');canvas.style.pointerEvents='none';renderMeta()}
-function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000)*gameSpeed;last=t;try{update(dt);draw()}catch(e){console.error(e);toast('游戏运行异常：'+(e?.message||'未知错误'));state='paused';return}requestAnimationFrame(loop)}
+function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000)*gameSpeed;last=t;try{loopStage='update';update(dt);loopStage='draw';draw();loopStage='idle'}catch(e){reportRuntimeError(e,loopStage);return}requestAnimationFrame(loop)}
+function reportRuntimeError(e,stage){if(runtimeErrorShown)return;runtimeErrorShown=true;state='paused';console.error('[RogueGame]',stage,e);const msg=(e&&e.message)||String(e)||'未知错误';let box=$('runtimeError');if(!box){box=document.createElement('section');box.id='runtimeError';box.style.cssText='position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.72);font-family:system-ui,sans-serif;color:#fff';box.innerHTML='<div style="width:min(92vw,520px);background:#121722;border:1px solid #5b6578;border-radius:16px;padding:22px;box-shadow:0 20px 80px #000;text-align:center"><h2 style="margin:0 0 10px">游戏运行已暂停</h2><p id="runtimeErrorText" style="color:#ffb4b4;word-break:break-word"></p><p id="runtimeErrorStage" style="color:#9da8bb;font-size:12px"></p><button id="runtimeRestart" style="width:100%;padding:12px;border:0;border-radius:10px;background:#6d8cff;color:#fff;font-size:16px">重新开始本局</button><button id="runtimeHome" style="width:100%;padding:12px;margin-top:8px;border:0;border-radius:10px;background:#252c3a;color:#fff;font-size:16px">返回首页</button></div>';document.body.appendChild(box);$('runtimeRestart').onclick=()=>{box.remove();runtimeErrorShown=false;start()};$('runtimeHome').onclick=()=>{box.remove();runtimeErrorShown=false;goHome()}}$('runtimeErrorText').textContent='错误：'+msg;$('runtimeErrorStage').textContent='发生位置：'+stage+' · 时间：'+fmt(elapsed);if(typeof toast==='function')toast('游戏异常：'+msg)}
 function update(dt){elapsed+=dt;spawn-=dt;
  let dx=(keys.d?1:0)-(keys.a?1:0),dy=(keys.s?1:0)-(keys.w?1:0);if(joystick.active){dx+=joystick.x;dy+=joystick.y}let l=Math.hypot(dx,dy)||1;if(dx||dy){player.x=Math.max(20,Math.min(W-20,player.x+dx/l*player.speed*dt));player.y=Math.max(20,Math.min(H-20,player.y+dy/l*player.speed*dt))}
  if(elapsed>=300&&!boss){spawnBoss();}
  if(elapsed>=nextChest&&!boss){spawnChest();nextChest+=90}
  if(elapsed>=nextEvent&&!boss){spawnEvent();nextEvent+=120}
- if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);spawnEnemy()}autoShoot(dt);
+ if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);if(enemies.length<MAX_ENEMIES)spawnEnemy()}autoShoot(dt);
  for(const e of enemies){
   let a=Math.atan2(player.y-e.y,player.x-e.x),slow=e.slowTimer>0?(e.slow||.55):1;if(e.boostTimer>0){slow*=e.boost||1.6;e.boostTimer-=dt}if(e.shieldTimer>0)e.shieldTimer-=dt;
   if(e.elite){e.skill=(e.skill||5)-dt;if(e.skill<=0){e.skill=5+Math.random()*2;eliteSkill(e)}}
@@ -70,13 +72,13 @@ function update(dt){elapsed+=dt;spawn-=dt;
       player.hp-=e.dmg*dt*(player.relics?.includes('guard')?.88:1)*(player.synergyHG?.9:1);
     }
 if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾抵挡了致命伤害')}else{end();return}}}}
- for(const b of bullets){b.age=(b.age||0)+dt;if(b.weapon)weaponFx(b);if(b.boomerang){if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage*(player.relics?.includes('guard')?.88:1)*(player.synergyHG?.9:1);if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&boss.spawned&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage*relicDamageMul(boss);if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.hp<=0){finishBoss();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);if(player.synergyFI&&(b.id==='fire'||b.id==='ice'))synergyBurst(b.x,b.y);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
- bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60);enemies=enemies.filter(e=>!e.dead);
+ for(const b of bullets){b.age=(b.age||0)+dt;if(b.weapon)weaponFx(b);if(b.boomerang){if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage*(player.relics?.includes('guard')?.88:1)*(player.synergyHG?.9:1);if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&boss.spawned&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage*relicDamageMul(boss);if(b.weapon==='fire'&&particles.length<MAX_PARTICLES){for(let i=0;i<8&&particles.length<MAX_PARTICLES;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.hp<=0){finishBoss();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);if(player.synergyFI&&(b.weapon==='fire'||b.weapon==='ice'))synergyBurst(b.x,b.y);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
+ bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60).slice(-MAX_BULLETS);enemies=enemies.filter(e=>!e.dead).slice(-MAX_ENEMIES);
  if(boss&&!boss.dead)updateBoss(dt);if(boss&&!boss.defeated&&boss.hp<=0){finishBoss();return;}
  for(const c of chests){c.life-=dt;if(!c.dead&&dist(c,player)<player.r+c.r+14)openChest(c)}chests=chests.filter(c=>!c.dead&&c.life>0);events=events.filter(e=>{e.life-=dt;return e.life>0});
  for(const d of drops){let dd=dist(d,player);if(dd<player.magnet){let a=Math.atan2(player.y-d.y,player.x-d.x);d.x+=Math.cos(a)*220*dt;d.y+=Math.sin(a)*220*dt}if(dist(d,player)<player.r+d.r){if(d.type==='xp')gainXp(d.v);else if(d.type==='power'){const choices=['damage','rate','heal'];const type=choices[Math.floor(Math.random()*choices.length)];if(type==='damage')player.damageMul*=1.12;else if(type==='rate')player.rateMul*=.9;else player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.25);toast(type==='damage'?'强化核心：伤害 +12%':type==='rate'?'强化核心：攻击速度 +10%':'强化核心：恢复 25% 生命')}else if(d.type==='bomb'){for(const e of enemies){if(!e.dead&&dist(d,e)<110){e.hp-=d.v;if(e.hp<=0)kill(e)}}for(let i=0;i<24;i++)particles.push({x:d.x,y:d.y,vx:(Math.random()-.5)*300,vy:(Math.random()-.5)*300,life:.5});toast('爆裂核心：范围伤害')}else player.gold+=Math.ceil(d.v*(player.relics?.includes('greed')?1.25:1));d.dead=true}}drops=drops.filter(d=>!d.dead);
  for(const ev of events){if(ev.type==='meteor'&&ev.life<=1.5&&ev.points){for(const pt of ev.points)if(!pt.done){pt.done=true;for(const e of enemies)if(!e.dead&&dist(e,pt)<80){e.hp-=70;if(e.hp<=0)kill(e)}if(dist(player,pt)<80){player.hp-=35;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}}}if(ev.type==='shrine'&&!ev.used&&dist(player,ev)<35){ev.used=true;player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.35);player.xp+=player.next*.35;toast('祭坛：恢复生命并获得经验！')}}
- for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);ui()}
+ for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0).slice(-MAX_PARTICLES);ui()}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function eliteSkill(e){
   const type=e.type||'normal';
@@ -160,12 +162,12 @@ function autoShoot(dt){
     if(w.cd<=0){shootWeapon(id,w);w.cd=w.rate*player.rateMul}
   }
 }
-function synergyBurst(x,y){for(const e of enemies)if(!e.dead&&dist({x,y},e)<70){e.hp-=35;if(e.hp<=0)kill(e)}for(let i=0;i<10;i++)particles.push({x,y,vx:(Math.random()-.5)*160,vy:(Math.random()-.5)*160,life:.3})}
+function synergyBurst(x,y){for(const e of enemies)if(!e.dead&&dist({x,y},e)<70){e.hp-=35;if(e.hp<=0)kill(e)}for(let i=0;i<10&&particles.length<MAX_PARTICLES;i++)particles.push({x,y,vx:(Math.random()-.5)*160,vy:(Math.random()-.5)*160,life:.3})}
 function shootWeapon(id,w){
   let damage=w.damage*player.damageMul*relicDamageMul(null)*(Math.random()<player.crit?2:1);if((id==='fire'||id==='ice')&&player.synergyFI)damage*=1.25;if((id==='lightning'||id==='magic')&&player.synergyML)damage*=id==='lightning'?1.2:1;if((id==='knife'||id==='boomerang')&&player.synergyKB)damage*=1.18;
   if(id==='lightning'){
     const targets=enemies.filter(e=>!e.dead).sort((a,b)=>dist(a,player)-dist(b,player)).slice(0,w.count||3);
-    if(boss&&!boss.dead&&targets.length<(w.count||3))targets.push(boss);
+    if(boss&&!boss.dead&&boss.spawned&&targets.length<(w.count||3))targets.push(boss);
     for(const t of targets){t.hp-=damage;particles.push({x:t.x,y:t.y,vx:0,vy:0,life:.45,lightning:true});if(t!==boss&&t.hp<=0)kill(t)}
     if(boss&&!boss.dead&&boss.spawned&&boss.hp<=0){finishBoss();return}
     return;
@@ -243,7 +245,7 @@ function updateBoss(dt){
   }
   let a=Math.atan2(player.y-boss.y,player.x-boss.x);boss.x+=Math.cos(a)*boss.speed*dt;boss.y+=Math.sin(a)*boss.speed*dt;if(dist(boss,player)<boss.r+player.r){player.hp-=boss.dmg*dt*(player.relics?.includes('guard')?.88:1)*(player.synergyHG?.9:1);if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}boss.shot-=dt;
   boss.skill-=dt;boss.summon-=dt;boss.teleport-=dt;
-  if(boss.summon<=0){boss.summon=boss.phase===1?11:7;const n=boss.phase===1?3:6;for(let i=0;i<n;i++){spawnEnemy();const e=enemies[enemies.length-1];e.x=boss.x+(Math.random()-.5)*180;e.y=boss.y+(Math.random()-.5)*180;e.elite=boss.phase===2&&Math.random()<.25}toast(boss.phase===1?'BOSS 召唤援军！':'BOSS 召唤精英援军！')}
+  if(boss.summon<=0){boss.summon=boss.phase===1?11:7;const n=boss.phase===1?3:6;for(let i=0;i<n&&enemies.length<MAX_ENEMIES;i++){spawnEnemy();const e=enemies[enemies.length-1];e.x=boss.x+(Math.random()-.5)*180;e.y=boss.y+(Math.random()-.5)*180;if(boss.phase===2&&Math.random()<.25)applyElite(e)}toast(boss.phase===1?'BOSS 召唤援军！':'BOSS 召唤精英援军！')}
   if(boss.teleport<=0){boss.teleport=boss.phase===1?16:10;const a=Math.random()*Math.PI*2;boss.x=Math.max(60,Math.min(W-60,player.x+Math.cos(a)*(180+Math.random()*120)));boss.y=Math.max(100,Math.min(H-60,player.y+Math.sin(a)*(180+Math.random()*120)));boss.flash=.5;toast('BOSS 瞬移！')}
   if(boss.skill<=0){
     boss.skill=boss.phase===1?6:4;
@@ -254,7 +256,7 @@ function updateBoss(dt){
     toast(boss.phase===1?'BOSS 释放冲击波！':'BOSS 释放强化冲击波！');
   }
   boss.flash=Math.max(0,(boss.flash||0)-dt);
-  if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<=0){boss.hp=0;boss.dead=true;boss.defeated=true;particles.push({x:boss.x,y:boss.y,vx:0,vy:0,life:1.5,bossSkill:true,radius:boss.r*3});toast('BOSS 已击败！');victory();return}if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.speed=62;boss.dmg=42;toast('BOSS 进入第二阶段！')}}
+  if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<=0){finishBoss();return}if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.speed=62;boss.dmg=42;toast('BOSS 进入第二阶段！')}}
 function persistMeta(){try{localStorage.setItem('roguegame_meta',JSON.stringify(meta))}catch(e){}}
 function restoreLocalMeta(){try{const x=JSON.parse(localStorage.getItem('roguegame_meta')||'null');if(x&&typeof x==='object'){meta={gold:Number(x.gold||0),upgrades:{hp:Number(x.upgrades?.hp||0),damage:Number(x.upgrades?.damage||0),speed:Number(x.upgrades?.speed||0)}}}}catch(e){}}
 function bankRunGold(rate=1){if(player&&player.gold>0){const earned=Math.floor(player.gold*Math.max(0,Math.min(1,rate)));meta.gold+=earned;player.gold=0;persistMeta();return earned}return 0}
