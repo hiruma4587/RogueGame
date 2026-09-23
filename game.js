@@ -178,7 +178,7 @@ function shootWeapon(id,w){
 }
 function hitEnemy(e,b){
   e.hp-=b.damage*relicDamageMul(e)*(e.shieldTimer>0?(1-(e.shield||.45)):1);hitFx(e.x,e.y,b.weapon==='fire'?'#ff7a45':'#fff');
-  if(b.weapon==='ice'){e.slow=.45;e.slowTimer=2.5;}
+  if(b.weapon==='ice'){e.slow=.45;e.slowTimer=2.5;}if(e.type==='splitter'&&e.hp<=e.maxHp*.5&&!e.splitTriggered){e.splitTriggered=true;for(let i=0;i<2;i++){const a=i*Math.PI+Math.random()*.5;enemies.push({id:crypto.randomUUID(),x:e.x+Math.cos(a)*18,y:e.y+Math.sin(a)*18,r:8,hp:e.maxHp*.22,maxHp:e.maxHp*.22,speed:e.speed*1.4,dmg:7,elite:false,type:'normal',dead:false,shot:0,split:0})}}
   if(b.weapon==='fire'){
     const w=player.weapons.fire;
     const radius=w?.evolved?90:55;
