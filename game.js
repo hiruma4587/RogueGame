@@ -182,14 +182,17 @@ function updateBoss(dt){
   if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.speed=62;boss.dmg=42;toast('BOSS 进入第二阶段！')}}
 function bankRunGold(){if(player&&player.gold>0){meta.gold+=player.gold;player.gold=0}}
 function end(){bankRunGold();state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+player.gold+' · 生存 '+fmt(elapsed);show('result');saveCloud(false)}
-function victory(){
+async function victory(){
   if(!boss||!boss.spawned||!boss.defeated)return;
-  state='victory';
   player.gold+=100;
   bankRunGold();
-  saveCloud(false);
-  $('victoryText').textContent='最终 Boss 已击败！本局通关 · 获得 100 金币 · 等级 '+player.level+' · 击杀 '+player.kills;
+  state='victory';
+  $('victoryText').textContent='最终 Boss 已击败！本局通关 · 获得 100 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 正在保存…';
   show('victory');
+  const ok=await saveCloud(false);
+  $('victoryText').textContent=ok
+    ? '最终 Boss 已击败！本局通关 · 获得 100 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 云存档已保存'
+    : '最终 Boss 已击败！本局通关 · 获得 100 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 云存档保存失败，请稍后重试';
 }
 function fmt(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
 function ui(){$('hp').textContent=Math.ceil(player.hp)+'/'+player.maxHp;$('level').textContent=player.level;$('gold').textContent=player.gold;$('time').textContent=fmt(elapsed);$('hpbar').style.width=Math.max(0,player.hp/player.maxHp*100)+'%';$('xpbar').style.width=Math.min(100,player.xp/player.next*100)+'%';$('weapon').textContent=Object.values(player.weapons).filter(Boolean).map(w=>w.name+' Lv.'+w.level).join(' · ');if(boss){$('bossbar').classList.remove('hidden');$('bossfill').style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%'}else $('bossbar').classList.add('hidden')}
@@ -236,7 +239,22 @@ function draw(){
   }
   ctx.globalAlpha=1;
 }
-async function saveCloud(manual){try{const savePlayer=player||fresh();let r=await fetch('/api/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({player:savePlayer,elapsed,meta})});if(!r.ok)throw Error();if(manual)toast('云存档已保存')}catch(e){if(manual)toast('云存档不可用')}}
+async function saveCloud(manual){
+  try{
+    const savePlayer=player||fresh();
+    const r=await fetch('/api/save',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({player:savePlayer,elapsed,meta})});
+    if(!r.ok){
+      let detail='';
+      try{const d=await r.json();detail=d.error||''}catch{}
+      throw Error(detail||'HTTP '+r.status);
+    }
+    if(manual)toast('云存档已保存');
+    return true;
+  }catch(e){
+    if(manual)toast('云存档不可用：'+(e.message||'保存失败'));
+    return false;
+  }
+}
 async function loadCloud(){try{let r=await fetch('/api/save');if(!r.ok)throw Error();let d=await r.json();if(d.save){meta=d.save.meta||meta;start(d.save.player);toast('已读取云存档')}else toast('暂无云存档')}catch(e){toast('暂无可用云存档')}}
 function openMeta(){state='meta';hide('menu');hide('result');hide('victory');hide('levelup');renderMeta();show('meta')}
 function closeMeta(){state='menu';hide('meta');show('menu')}
