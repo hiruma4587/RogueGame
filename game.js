@@ -86,8 +86,8 @@ function options(){
   for(const p of PASSIVES)if(!player.passives.includes(p[0]))arr.push({title:p[0],desc:p[1],apply:()=>{player.passives.push(p[0]);p[2](player)}});
   return arr.sort(()=>Math.random()-.5).slice(0,3)
 }
-function spawnBoss(){boss={x:W/2,y:-80,r:42,maxHp:1800+elapsed*4,hp:1800+elapsed*4,speed:55,dmg:30,phase:1,shot:1,spawned:true,defeated:false};toast('BOSS 出现！坚持到击败它');}
-function updateBoss(dt){if(boss.dead)return;let a=Math.atan2(player.y-boss.y,player.x-boss.x);boss.x+=Math.cos(a)*boss.speed*dt;boss.y+=Math.sin(a)*boss.speed*dt;if(dist(boss,player)<boss.r+player.r){player.hp-=boss.dmg*dt;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}boss.shot-=dt;if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<boss.maxHp*.5)boss.phase=2}
+function spawnBoss(){boss={x:W/2,y:-80,r:42,maxHp:15000+elapsed*12,hp:15000+elapsed*12,speed:42,dmg:30,phase:1,shot:1,spawned:true,defeated:false};toast('BOSS 出现！坚持到击败它');}
+function updateBoss(dt){if(boss.dead)return;let a=Math.atan2(player.y-boss.y,player.x-boss.x);boss.x+=Math.cos(a)*boss.speed*dt;boss.y+=Math.sin(a)*boss.speed*dt;if(dist(boss,player)<boss.r+player.r){player.hp-=boss.dmg*dt;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}boss.shot-=dt;if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.speed=62;boss.dmg=42;toast('BOSS 进入第二阶段！')}
 function end(){state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+player.gold+' · 生存 '+fmt(elapsed);show('result');saveCloud(false)}
 function victory(){
   if(!boss||!boss.spawned||!boss.defeated)return;
