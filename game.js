@@ -202,15 +202,11 @@ function options(){
   const ws=Object.entries(WEAPONS).filter(([id])=>!player.weapons[id]||player.weapons[id].level<5);
   for(const [id,w] of ws){
     if(!player.weapons[id]){
-      arr.push({title:'获得 '+w.name,desc:w.desc+' · 伤害 '+w.damage,apply:()=>player.weapons[id]={...w,level:1}});
+      arr.push({title:'获得 '+w.name,desc:w.desc+' · Lv.1 → Lv.5 自动进化为 '+(EVOLUTIONS[id]?.name||'最高形态'),apply:()=>player.weapons[id]={...w,level:1}});
     }else{
-      const x=player.weapons[id];
-      arr.push({title:w.name+' 升级 Lv.'+(x.level+1),desc:'伤害 +25%，攻击频率提升',apply:()=>{x.level++;x.damage*=1.25;x.rate*=.88;x.count=Math.min(5,x.count+(id==='magic'&&x.level%3===0?1:0));x.pierce=(x.pierce||0)+(id==='knife'&&x.level%2===0?1:0)}});
+      const x=player.weapons[id],next=x.level+1,willEvolve=next>=5&&EVOLUTIONS[id]&&!x.evolved;
+      arr.push({title:w.name+' 升级 Lv.'+next+(willEvolve?' · 即将进化':''),desc:willEvolve?EVOLUTIONS[id].desc:'伤害 +25%，攻击频率提升',apply:()=>{x.level++;x.damage*=1.25;x.rate*=.88;x.count=Math.min(5,x.count+(id==='magic'&&x.level%3===0?1:0));x.pierce=(x.pierce||0)+(id==='knife'&&x.level%2===0?1:0);if(x.level>=5&&!x.evolved&&EVOLUTIONS[id])EVOLUTIONS[id].apply(x)}});
     }
-  }
-  for(const [id,evo] of Object.entries(EVOLUTIONS)){
-    const x=player.weapons[id];
-    if(x&&x.level>=5&&!x.evolved)arr.push({title:'进化 · '+evo.name,desc:evo.desc,apply:()=>EVOLUTIONS[id].apply(x)});
   }
   for(const p of PASSIVES)if(!player.passives.includes(p[0]))arr.push({title:p[0],desc:p[1],apply:()=>{player.passives.push(p[0]);p[2](player)}});
   return arr.sort(()=>Math.random()-.5).slice(0,3)
