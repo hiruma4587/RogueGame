@@ -45,14 +45,51 @@ function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/100
 function update(dt){elapsed+=dt;spawn-=dt;
  let dx=(keys.d?1:0)-(keys.a?1:0),dy=(keys.s?1:0)-(keys.w?1:0);if(joystick.active){dx+=joystick.x;dy+=joystick.y}let l=Math.hypot(dx,dy)||1;if(dx||dy){player.x=Math.max(20,Math.min(W-20,player.x+dx/l*player.speed*dt));player.y=Math.max(20,Math.min(H-20,player.y+dy/l*player.speed*dt))}
  if(elapsed>=300&&!boss){spawnBoss();}if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);spawnEnemy()}autoShoot(dt);
- for(const e of enemies){let a=Math.atan2(player.y-e.y,player.x-e.x);const slow=e.slowTimer>0?(e.slow||.55):1;e.x+=Math.cos(a)*e.speed*slow*dt;e.y+=Math.sin(a)*e.speed*slow*dt;if(e.slowTimer>0)e.slowTimer-=dt;if(dist(e,player)<e.r+player.r){player.hp-=e.dmg*dt;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾抵挡了致命伤害')}else{end();return}}}}
+ for(const e of enemies){
+  let a=Math.atan2(player.y-e.y,player.x-e.x),slow=e.slowTimer>0?(e.slow||.55):1;
+  if(e.type==='ranged'){
+    const d=dist(e,player);
+    if(d>260){e.x+=Math.cos(a)*e.speed*slow*dt;e.y+=Math.sin(a)*e.speed*slow*dt}
+    else if(d<190){e.x-=Math.cos(a)*e.speed*slow*dt;e.y-=Math.sin(a)*e.speed*slow*dt}
+    e.shot-=dt;
+    if(e.shot<=0){e.shot=2.2;bullets.push({x:e.x,y:e.y,a,speed:150,r:6,damage:12,life:2.5,pierce:0,enemy:true})}
+  }else{
+    e.x+=Math.cos(a)*e.speed*slow*dt;e.y+=Math.sin(a)*e.speed*slow*dt;
+  }
+  if(e.slowTimer>0)e.slowTimer-=dt;
+  if(dist(e,player)<e.r+player.r){
+    if(e.type==='bomber'){
+      e.dead=true;
+      for(const o of enemies)if(o!==e&&!o.dead&&dist(o,e)<75)o.hp-=28;
+      player.hp-=e.dmg;
+    }else{
+      player.hp-=e.dmg*dt;
+    }
+if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾抵挡了致命伤害')}else{end();return}}}}
  for(const b of bullets){if(b.boomerang){b.age=(b.age||0)+dt;if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage;if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.spawned&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
  bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60);enemies=enemies.filter(e=>!e.dead);
  if(boss)updateBoss(dt);
  for(const d of drops){let dd=dist(d,player);if(dd<player.magnet){let a=Math.atan2(player.y-d.y,player.x-d.x);d.x+=Math.cos(a)*220*dt;d.y+=Math.sin(a)*220*dt}if(dist(d,player)<player.r+d.r){if(d.type==='xp')gainXp(d.v);else player.gold+=d.v;d.dead=true}}drops=drops.filter(d=>!d.dead);
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);ui()}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
-function spawnEnemy(){let s=Math.floor(Math.random()*4),x=s<2?(s?W+30:-30):Math.random()*W,y=s<2?Math.random()*H:(s===2?-30:H+30),elite=Math.random()<Math.min(.2,elapsed/420),hp=elite?90+elapsed*.55:30+elapsed*.22;enemies.push({id:crypto.randomUUID(),x,y,r:elite?20:13,hp,maxHp:hp,speed:elite?55:78+Math.min(55,elapsed*.06),dmg:elite?24:12,elite,dead:false})}
+function spawnEnemy(){
+  let s=Math.floor(Math.random()*4),x=s<2?(s?W+30:-30):Math.random()*W,y=s<2?Math.random()*H:(s===2?-30:H+30);
+  const elite=Math.random()<Math.min(.2,elapsed/420);
+  const roll=Math.random();
+  let type='normal';
+  if(!elite&&elapsed>45&&roll<.12)type='swift';
+  else if(!elite&&elapsed>75&&roll<.22)type='tank';
+  else if(!elite&&elapsed>105&&roll<.30)type='ranged';
+  else if(!elite&&elapsed>150&&roll<.38)type='splitter';
+  else if(!elite&&elapsed>210&&roll<.46)type='bomber';
+  let hp=elite?90+elapsed*.55:30+elapsed*.22,speed=78+Math.min(55,elapsed*.06),dmg=12,r=13;
+  if(type==='swift'){hp*=.65;speed*=1.8;dmg=10;r=11}
+  if(type==='tank'){hp*=3.8;speed*=.42;dmg=20;r=20}
+  if(type==='ranged'){hp*=1.15;speed*=.55;dmg=0;r=15}
+  if(type==='splitter'){hp*=1.7;speed*=.8;dmg=16;r=17}
+  if(type==='bomber'){hp*=1.1;speed*=1.15;dmg=35;r=14}
+  enemies.push({id:crypto.randomUUID(),x,y,r,hp,maxHp:hp,speed,dmg,elite,type,dead:false,shot:type==='ranged'?1:0,split:type==='splitter'?1:0});
+}
 function nearest(){return enemies.reduce((a,e)=>dist(e,player)<dist(a,player)?e:a,enemies[0])}
 function autoShoot(dt){
   for(const [id,w] of Object.entries(player.weapons)){
@@ -93,7 +130,13 @@ function hitEnemy(e,b){
   if(e.hp<=0)kill(e);
   for(const other of enemies)if(other!==e&&!other.dead&&other.hp<=0)kill(other);
 }
-function kill(e){e.dead=true;player.kills++;drops.push({x:e.x,y:e.y,r:6,type:'xp',v:e.elite?5:2});if(Math.random()<.14)drops.push({x:e.x+5,y:e.y+5,r:5,type:'gold',v:e.elite?5:1});for(let i=0;i<7;i++)particles.push({x:e.x,y:e.y,vx:(Math.random()-.5)*150,vy:(Math.random()-.5)*150,life:.35})}
+function kill(e){
+  if(e.dead)return;
+  e.dead=true;player.kills++;
+  if(e.type==='splitter'&&e.split>0){
+    for(let i=0;i<2;i++){const a=i*Math.PI+Math.random()*.6;enemies.push({id:crypto.randomUUID(),x:e.x,y:e.y,r:9,hp:e.maxHp*.3,maxHp:e.maxHp*.3,speed:e.speed*1.35,dmg:8,elite:false,type:'normal',dead:false,shot:0,split:0})}
+  }
+  drops.push({x:e.x,y:e.y,r:6,type:'xp',v:e.elite?5:(e.type==='tank'?4:2)});if(Math.random()<.14)drops.push({x:e.x+5,y:e.y+5,r:5,type:'gold',v:e.elite?5:1});for(let i=0;i<7;i++)particles.push({x:e.x,y:e.y,vx:(Math.random()-.5)*150,vy:(Math.random()-.5)*150,life:.35})}
 function gainXp(v){player.xp+=v*player.xpMul;while(player.xp>=player.next){player.xp-=player.next;player.level++;player.next=Math.floor(player.next*1.32);openLevelUp()}}
 function openLevelUp(){state='levelup';$('choices').innerHTML='';const opts=options();opts.forEach(o=>{const el=document.createElement('div');el.className='choice';el.innerHTML='<strong>'+o.title+'</strong><span>'+o.desc+'</span>';el.onclick=()=>{o.apply();hide('levelup');state='playing';last=performance.now();requestAnimationFrame(loop)};$('choices').appendChild(el)});show('levelup')}
 function options(){
