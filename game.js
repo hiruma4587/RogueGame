@@ -197,18 +197,26 @@ function kill(e){
   drops.push({x:e.x,y:e.y,r:6,type:'xp',v:e.elite?5:(e.type==='tank'?4:2)});if(Math.random()<.14)drops.push({x:e.x+5,y:e.y+5,r:5,type:'gold',v:e.elite?5:1});if(e.elite&&Math.random()<.28)drops.push({x:e.x-6,y:e.y-6,r:7,type:'power',v:1});if(e.elite&&Math.random()<.12)drops.push({x:e.x+8,y:e.y-8,r:8,type:'bomb',v:45});for(let i=0;i<7;i++)particles.push({x:e.x,y:e.y,vx:(Math.random()-.5)*150,vy:(Math.random()-.5)*150,life:.35})}
 function gainXp(v){player.xp+=v*player.xpMul;while(player.xp>=player.next){player.xp-=player.next;player.level++;player.next=Math.floor(player.next*1.32);openLevelUp()}}
 function openLevelUp(){state='levelup';$('choices').innerHTML='';const opts=options();opts.forEach(o=>{const el=document.createElement('div');el.className='choice';el.innerHTML='<strong>'+o.title+'</strong><span>'+o.desc+'</span>';el.onclick=()=>{o.apply();hide('levelup');state='playing';last=performance.now();requestAnimationFrame(loop)};$('choices').appendChild(el)});show('levelup')}
+const WEAPON_SYNERGIES={
+ magic:{name:'奥术强化',desc:'魔法弹升级同时：所有伤害 +5%',apply:p=>p.damageMul*=1.05},
+ knife:{name:'疾风刀术',desc:'飞刀升级同时：移动速度 +4%',apply:p=>p.speed*=1.04},
+ fire:{name:'烈焰暴击',desc:'火球升级同时：暴击率 +3%',apply:p=>p.crit=Math.min(.6,p.crit+.03)},
+ lightning:{name:'雷霆迅捷',desc:'闪电链升级同时：攻击速度 +5%',apply:p=>p.rateMul*=.95},
+ boomerang:{name:'回刃磁场',desc:'回旋刃升级同时：拾取范围 +10%',apply:p=>p.magnet*=1.1},
+ ice:{name:'寒霜汲取',desc:'冰霜弹升级同时：经验获取 +5%',apply:p=>p.xpMul*=1.05},
+ holy:{name:'圣光生命',desc:'圣光升级同时：最大生命 +10，并回复 10 HP',apply:p=>{p.maxHp+=10;p.hp=Math.min(p.maxHp,p.hp+10)}},
+};
 function options(){
   let arr=[];
   const ws=Object.entries(WEAPONS).filter(([id])=>!player.weapons[id]||player.weapons[id].level<5);
   for(const [id,w] of ws){
     if(!player.weapons[id]){
-      arr.push({title:'获得 '+w.name,desc:w.desc+' · Lv.1 → Lv.5 自动进化为 '+(EVOLUTIONS[id]?.name||'最高形态'),apply:()=>player.weapons[id]={...w,level:1}});
+      arr.push({title:'获得 '+w.name,desc:w.desc+' · Lv.1 → Lv.5 自动进化为 '+(EVOLUTIONS[id]?.name||'最高形态')+' · '+(WEAPON_SYNERGIES[id]?.desc||''),apply:()=>{player.weapons[id]={...w,level:1};WEAPON_SYNERGIES[id]?.apply(player)}});
     }else{
       const x=player.weapons[id],next=x.level+1,willEvolve=next>=5&&EVOLUTIONS[id]&&!x.evolved;
-      arr.push({title:w.name+' 升级 Lv.'+next+(willEvolve?' · 即将进化':''),desc:willEvolve?EVOLUTIONS[id].desc:'伤害 +25%，攻击频率提升',apply:()=>{x.level++;x.damage*=1.25;x.rate*=.88;x.count=Math.min(5,x.count+(id==='magic'&&x.level%3===0?1:0));x.pierce=(x.pierce||0)+(id==='knife'&&x.level%2===0?1:0);if(x.level>=5&&!x.evolved&&EVOLUTIONS[id])EVOLUTIONS[id].apply(x)}});
+      arr.push({title:w.name+' 升级 Lv.'+next+(willEvolve?' · 即将进化':''),desc:(willEvolve?EVOLUTIONS[id].desc:'伤害 +25%，攻击频率提升')+' · '+(WEAPON_SYNERGIES[id]?.desc||''),apply:()=>{x.level++;x.damage*=1.25;x.rate*=.88;x.count=Math.min(5,x.count+(id==='magic'&&x.level%3===0?1:0));x.pierce=(x.pierce||0)+(id==='knife'&&x.level%2===0?1:0);WEAPON_SYNERGIES[id]?.apply(player);if(x.level>=5&&!x.evolved&&EVOLUTIONS[id])EVOLUTIONS[id].apply(x)}});
     }
   }
-  for(const p of PASSIVES)if(!player.passives.includes(p[0]))arr.push({title:p[0],desc:p[1],apply:()=>{player.passives.push(p[0]);p[2](player)}});
   return arr.sort(()=>Math.random()-.5).slice(0,3)
 }
 function spawnBoss(){
