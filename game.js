@@ -60,3 +60,16 @@ async function loadCloud(){try{let r=await fetch('/api/save');if(!r.ok)throw Err
 function toast(s){$('toast').textContent=s;$('toast').style.opacity=1;setTimeout(()=>$('toast').style.opacity=0,1600)}
 
 window.start=start;window.loadCloud=loadCloud;window.saveCloud=saveCloud;
+
+(function(){
+  document.addEventListener('pointerdown',function(e){
+    const b=e.target.closest && e.target.closest('button');
+    if(!b)return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id=b.id;
+    if(id==='start'||id==='again'||id==='victoryAgain') window.start();
+    else if(id==='continue') window.loadCloud();
+    else if(id==='save') window.saveCloud(true);
+  },true);
+})();
