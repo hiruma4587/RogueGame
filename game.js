@@ -180,13 +180,13 @@ function updateBoss(dt){
     toast(boss.phase===1?'BOSS 释放冲击波！':'BOSS 释放强化冲击波！');
   }
   if(boss.shot<=0){boss.shot=boss.phase===1?1.3:.75;for(let i=0;i<(boss.phase===1?8:12);i++){let a=i*Math.PI*2/(boss.phase===1?8:12);bullets.push({x:boss.x,y:boss.y,a,speed:180,r:7,damage:12,life:2,pierce:0,enemy:true})}}if(boss.hp<boss.maxHp*.5&&boss.phase===1){boss.phase=2;boss.speed=62;boss.dmg=42;toast('BOSS 进入第二阶段！')}}
-function bankRunGold(){if(player&&player.gold>0){meta.gold+=player.gold;player.gold=0}}
-function end(){const runGold=player.gold;bankRunGold();state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+runGold+' · 永久金币 '+meta.gold+' · 生存 '+fmt(elapsed);show('result');saveCloud(false)}
+function bankRunGold(rate=1){if(player&&player.gold>0){const earned=Math.floor(player.gold*Math.max(0,Math.min(1,rate)));meta.gold+=earned;player.gold=0;return earned}return 0}
+function end(){const runGold=player.gold;const keptGold=bankRunGold(.5);state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+runGold+' · 本局保留 '+keptGold+' · 永久金币 '+meta.gold+' · 生存 '+fmt(elapsed);show('result');saveCloud(false)}
 async function victory(){
   if(!boss||!boss.spawned||!boss.defeated)return;
   const earned=player.gold+100;
   player.gold=earned;
-  bankRunGold();
+  bankRunGold(1);
   state='victory';
   $('victoryText').textContent='最终 Boss 已击败！本局获得 '+earned+' 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 正在保存…';
   show('victory');
