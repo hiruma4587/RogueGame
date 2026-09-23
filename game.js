@@ -36,7 +36,7 @@ function hide(id){$(id).classList.add('hidden')}function show(id){$(id).classLis
 function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000)*gameSpeed;last=t;update(dt);draw();requestAnimationFrame(loop)}
 function update(dt){elapsed+=dt;spawn-=dt;
  let dx=(keys.d?1:0)-(keys.a?1:0),dy=(keys.s?1:0)-(keys.w?1:0);if(joystick.active){dx+=joystick.x;dy+=joystick.y}let l=Math.hypot(dx,dy)||1;if(dx||dy){player.x=Math.max(20,Math.min(W-20,player.x+dx/l*player.speed*dt));player.y=Math.max(20,Math.min(H-20,player.y+dy/l*player.speed*dt))}
- if(elapsed>=300&&!boss){spawnBoss();}if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);spawnEnemy()}autoShoot();
+ if(elapsed>=300&&!boss){spawnBoss();}if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);spawnEnemy()}autoShoot(dt);
  for(const e of enemies){let a=Math.atan2(player.y-e.y,player.x-e.x);e.x+=Math.cos(a)*e.speed*dt;e.y+=Math.sin(a)*e.speed*dt;if(dist(e,player)<e.r+player.r){player.hp-=e.dmg*dt;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾抵挡了致命伤害')}else{end();return}}}}
  for(const b of bullets){b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage;if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.spawned&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
  bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60);enemies=enemies.filter(e=>!e.dead);
@@ -46,10 +46,10 @@ function update(dt){elapsed+=dt;spawn-=dt;
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function spawnEnemy(){let s=Math.floor(Math.random()*4),x=s<2?(s?W+30:-30):Math.random()*W,y=s<2?Math.random()*H:(s===2?-30:H+30),elite=Math.random()<Math.min(.2,elapsed/420),hp=elite?90+elapsed*.55:30+elapsed*.22;enemies.push({id:crypto.randomUUID(),x,y,r:elite?20:13,hp,maxHp:hp,speed:elite?55:78+Math.min(55,elapsed*.06),dmg:elite?24:12,elite,dead:false})}
 function nearest(){return enemies.reduce((a,e)=>dist(e,player)<dist(a,player)?e:a,enemies[0])}
-function autoShoot(){
+function autoShoot(dt){
   for(const [id,w] of Object.entries(player.weapons)){
     if(!w||w.level<=0)continue;
-    w.cd=(w.cd||0)-.016;
+    w.cd=(w.cd||0)-dt;
     if(w.cd<=0){shootWeapon(id,w);w.cd=w.rate*player.rateMul}
   }
 }
