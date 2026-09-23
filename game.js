@@ -3,12 +3,20 @@ let W,H,dpr,state='menu',gameSpeed=1,player,enemies=[],bullets=[],drops=[],parti
 const WEAPONS={
   magic:{name:'魔法弹',desc:'自动追踪最近敌人',level:1,damage:18,rate:.45,count:1,speed:600,life:1.2,pierce:0,color:'#ffe08a'},
   knife:{name:'飞刀',desc:'高速穿透敌人',level:0,damage:12,rate:.7,count:1,speed:720,life:1.3,pierce:1,color:'#b8e1ff'},
-  fire:{name:'火球',desc:'命中后爆炸',level:0,damage:30,rate:1.25,count:1,speed:420,life:1.6,pierce:0,color:'#ff9b5e'}
+  fire:{name:'火球',desc:'命中后爆炸',level:0,damage:30,rate:1.25,count:1,speed:420,life:1.6,pierce:0,color:'#ff9b5e'},
+  lightning:{name:'闪电链',desc:'瞬间攻击附近多个敌人',level:0,damage:24,rate:1.4,count:3,speed:0,life:.1,pierce:0,color:'#8fd8ff'},
+  boomerang:{name:'回旋刃',desc:'飞出后持续返回并造成伤害',level:0,damage:20,rate:1.15,count:1,speed:360,life:2.4,pierce:2,color:'#d6b3ff'},
+  ice:{name:'冰霜弹',desc:'命中敌人后降低其移动速度',level:0,damage:16,rate:.8,count:1,speed:520,life:1.5,pierce:0,color:'#8cecff'},
+  holy:{name:'圣光',desc:'以玩家为中心周期性造成范围伤害',level:0,damage:26,rate:1.8,count:1,speed:0,life:.1,pierce:0,color:'#fff2a8'}
 };
 const EVOLUTIONS={
   magic:{name:'奥术核心',desc:'魔法弹进化：伤害、数量与攻击速度大幅提升',apply:w=>{w.evolved=true;w.name='奥术核心';w.damage*=2;w.count=Math.min(6,(w.count||1)+2);w.rate*=.65;w.pierce=(w.pierce||0)+1}},
   knife:{name:'刀锋风暴',desc:'飞刀进化：同时投射更多飞刀并获得穿透',apply:w=>{w.evolved=true;w.name='刀锋风暴';w.damage*=1.8;w.count=Math.min(8,(w.count||1)+4);w.rate*=.7;w.pierce=(w.pierce||0)+2}},
-  fire:{name:'陨星',desc:'火球进化：爆炸范围与伤害大幅提升',apply:w=>{w.evolved=true;w.name='陨星';w.damage*=2.2;w.rate*=.78;w.life*=1.15}}
+  fire:{name:'陨星',desc:'火球进化：爆炸范围与伤害大幅提升',apply:w=>{w.evolved=true;w.name='陨星';w.damage*=2.2;w.rate*=.78;w.life*=1.15}},
+  lightning:{name:'雷神之怒',desc:'闪电链进化：攻击更多目标并提高伤害',apply:w=>{w.evolved=true;w.name='雷神之怒';w.damage*=2;w.count=Math.min(8,(w.count||3)+3);w.rate*=.7}},
+  boomerang:{name:'无限回刃',desc:'回旋刃进化：更快、更强并获得更多穿透',apply:w=>{w.evolved=true;w.name='无限回刃';w.damage*=1.9;w.speed*=1.25;w.life*=1.25;w.pierce+=3}},
+  ice:{name:'绝对零度',desc:'冰霜弹进化：伤害与减速效果大幅提升',apply:w=>{w.evolved=true;w.name='绝对零度';w.damage*=1.9;w.rate*=.72;w.count=Math.min(5,w.count+1)}},
+  holy:{name:'神圣领域',desc:'圣光进化：范围和伤害大幅提升',apply:w=>{w.evolved=true;w.name='神圣领域';w.damage*=2;w.rate*=.72;w.count=1}}
 };
 const PASSIVES=[
  ['锋利武器','所有武器伤害 +20%',p=>p.damageMul*=1.2],
@@ -37,8 +45,8 @@ function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/100
 function update(dt){elapsed+=dt;spawn-=dt;
  let dx=(keys.d?1:0)-(keys.a?1:0),dy=(keys.s?1:0)-(keys.w?1:0);if(joystick.active){dx+=joystick.x;dy+=joystick.y}let l=Math.hypot(dx,dy)||1;if(dx||dy){player.x=Math.max(20,Math.min(W-20,player.x+dx/l*player.speed*dt));player.y=Math.max(20,Math.min(H-20,player.y+dy/l*player.speed*dt))}
  if(elapsed>=300&&!boss){spawnBoss();}if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);spawnEnemy()}autoShoot(dt);
- for(const e of enemies){let a=Math.atan2(player.y-e.y,player.x-e.x);e.x+=Math.cos(a)*e.speed*dt;e.y+=Math.sin(a)*e.speed*dt;if(dist(e,player)<e.r+player.r){player.hp-=e.dmg*dt;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾抵挡了致命伤害')}else{end();return}}}}
- for(const b of bullets){b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage;if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.spawned&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
+ for(const e of enemies){let a=Math.atan2(player.y-e.y,player.x-e.x);const slow=e.slowTimer>0?(e.slow||.55):1;e.x+=Math.cos(a)*e.speed*slow*dt;e.y+=Math.sin(a)*e.speed*slow*dt;if(e.slowTimer>0)e.slowTimer-=dt;if(dist(e,player)<e.r+player.r){player.hp-=e.dmg*dt;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾抵挡了致命伤害')}else{end();return}}}}
+ for(const b of bullets){if(b.boomerang&&b.life< b.life0){}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage;if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.spawned&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
  bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60);enemies=enemies.filter(e=>!e.dead);
  if(boss)updateBoss(dt);
  for(const d of drops){let dd=dist(d,player);if(dd<player.magnet){let a=Math.atan2(player.y-d.y,player.x-d.x);d.x+=Math.cos(a)*220*dt;d.y+=Math.sin(a)*220*dt}if(dist(d,player)<player.r+d.r){if(d.type==='xp')gainXp(d.v);else player.gold+=d.v;d.dead=true}}drops=drops.filter(d=>!d.dead);
@@ -53,9 +61,29 @@ function autoShoot(dt){
     if(w.cd<=0){shootWeapon(id,w);w.cd=w.rate*player.rateMul}
   }
 }
-function shootWeapon(id,w){let t=boss&&!boss.dead?boss:nearest();if(!t)return;let base=Math.atan2(t.y-player.y,t.x-player.x),count=w.count||1;for(let i=0;i<count;i++){let spread=(i-(count-1)/2)*.14;bullets.push({x:player.x,y:player.y,a:base+spread,speed:w.speed,r:id==='fire'?8:5,damage:w.damage*player.damageMul*(Math.random()<player.crit?2:1),life:w.life,pierce:w.pierce||0,weapon:id,hit:[]})}}
+function shootWeapon(id,w){
+  const damage=w.damage*player.damageMul*(Math.random()<player.crit?2:1);
+  if(id==='lightning'){
+    const targets=enemies.filter(e=>!e.dead).sort((a,b)=>dist(a,player)-dist(b,player)).slice(0,w.count||3);
+    if(boss&&!boss.dead&&targets.length<(w.count||3))targets.push(boss);
+    for(const t of targets){t.hp-=damage;particles.push({x:t.x,y:t.y,vx:0,vy:0,life:.45,lightning:true});if(t!==boss&&t.hp<=0)kill(t)}
+    if(boss&&!boss.dead&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}
+    return;
+  }
+  if(id==='holy'){
+    const radius=w.evolved?180:115;
+    for(const e of enemies)if(!e.dead&&dist(e,player)<radius){e.hp-=damage;if(e.hp<=0)kill(e)}
+    if(boss&&!boss.dead&&dist(boss,player)<radius){boss.hp-=damage;if(boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}}
+    for(let i=0;i<12;i++)particles.push({x:player.x+(Math.random()-.5)*radius*2,y:player.y+(Math.random()-.5)*radius*2,vx:0,vy:0,life:.35,holy:true});
+    return;
+  }
+  let t=boss&&!boss.dead?boss:nearest();if(!t)return;
+  let base=Math.atan2(t.y-player.y,t.x-player.x),count=w.count||1;
+  for(let i=0;i<count;i++){let spread=(i-(count-1)/2)*.14;bullets.push({x:player.x,y:player.y,a:base+spread,speed:w.speed,r:id==='fire'?8:5,damage,life:w.life,pierce:w.pierce||0,weapon:id,hit:[],boomerang:id==='boomerang',startX:player.x,startY:player.y})}
+}
 function hitEnemy(e,b){
   e.hp-=b.damage;
+  if(b.weapon==='ice'){e.slow=.45;e.slowTimer=2.5;}
   if(b.weapon==='fire'){
     const w=player.weapons.fire;
     const radius=w?.evolved?90:55;
