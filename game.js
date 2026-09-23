@@ -26,7 +26,7 @@ joystickEl.addEventListener('pointerup',releaseJoystick);joystickEl.addEventList
 canvas.addEventListener('pointermove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});canvas.addEventListener('pointerdown',e=>{mouse.x=e.clientX;mouse.y=e.clientY});
 
 function fresh(){return{x:W/2,y:H/2,r:15,hp:100,maxHp:100,speed:230,damageMul:1,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
-function start(data){elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[]}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
+function start(data){canvas.style.pointerEvents='auto';elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[]}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
 function hide(id){$(id).classList.add('hidden')}function show(id){$(id).classList.remove('hidden')}
 function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000);last=t;update(dt);draw();requestAnimationFrame(loop)}
 function update(dt){elapsed+=dt;spawn-=dt;
@@ -59,7 +59,7 @@ async function saveCloud(manual){try{let r=await fetch('/api/save',{method:'POST
 async function loadCloud(){try{let r=await fetch('/api/save');if(!r.ok)throw Error();let d=await r.json();if(d.save){start(d.save.player);toast('已读取云存档')}else toast('暂无云存档')}catch(e){toast('暂无可用云存档')}}
 function toast(s){$('toast').textContent=s;$('toast').style.opacity=1;setTimeout(()=>$('toast').style.opacity=0,1600)}
 
-window.start=start;window.loadCloud=loadCloud;window.saveCloud=saveCloud;
+window.start=start;window.loadCloud=loadCloud;window.saveCloud=saveCloud;window.__RG_READY__=true;
 
 (function(){
   document.addEventListener('pointerdown',function(e){
