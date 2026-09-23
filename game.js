@@ -1,5 +1,5 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
-let W,H,dpr,state='menu',gameSpeed=1,meta={gold:0,upgrades:{hp:0,damage:0,speed:0}},player,enemies=[],bullets=[],drops=[],particles=[],keys={},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0;
+let W,H,dpr,state='menu',gameSpeed=1,meta={gold:0,upgrades:{hp:0,damage:0,speed:0}},player,enemies=[],bullets=[],drops=[],particles=[],chests=[],keys={},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0,nextChest=90;
 const WEAPONS={
   magic:{name:'魔法弹',desc:'自动追踪最近敌人',level:1,damage:18,rate:.45,count:1,speed:600,life:1.2,pierce:0,color:'#ffe08a'},
   knife:{name:'飞刀',desc:'高速穿透敌人',level:0,damage:12,rate:.7,count:1,speed:720,life:1.3,pierce:1,color:'#b8e1ff'},
@@ -38,13 +38,15 @@ function releaseJoystick(e){if(e.pointerId!==joystick.id)return;joystick.active=
 joystickEl.addEventListener('pointerup',releaseJoystick);joystickEl.addEventListener('pointercancel',releaseJoystick);
 
 function fresh(){return{x:W/2,y:H/2,r:15,hp:100+meta.upgrades.hp*10,maxHp:100+meta.upgrades.hp*10,speed:230*(1+meta.upgrades.speed*.05),damageMul:1+meta.upgrades.damage*.05,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
-function start(data){canvas.style.pointerEvents='none';if(matchMedia('(pointer: coarse)').matches)show('joystick');gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];boss=null;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
+function start(data){canvas.style.pointerEvents='none';if(matchMedia('(pointer: coarse)').matches)show('joystick');gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];chests=[];boss=null;nextChest=90;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
 function hide(id){const el=$(id);if(el)el.classList.add('hidden')}function show(id){const el=$(id);if(el)el.classList.remove('hidden')}
 function goHome(){state='menu';gameSpeed=1;updateSpeedButton();hide('result');hide('victory');hide('levelup');hide('metaPanel');hide('joystick');show('menu');canvas.style.pointerEvents='none';renderMeta()}
 function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000)*gameSpeed;last=t;update(dt);draw();requestAnimationFrame(loop)}
 function update(dt){elapsed+=dt;spawn-=dt;
  let dx=(keys.d?1:0)-(keys.a?1:0),dy=(keys.s?1:0)-(keys.w?1:0);if(joystick.active){dx+=joystick.x;dy+=joystick.y}let l=Math.hypot(dx,dy)||1;if(dx||dy){player.x=Math.max(20,Math.min(W-20,player.x+dx/l*player.speed*dt));player.y=Math.max(20,Math.min(H-20,player.y+dy/l*player.speed*dt))}
- if(elapsed>=300&&!boss){spawnBoss();}if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);spawnEnemy()}autoShoot(dt);
+ if(elapsed>=300&&!boss){spawnBoss();}
+ if(elapsed>=nextChest&&!boss){spawnChest();nextChest+=90}
+ if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);spawnEnemy()}autoShoot(dt);
  for(const e of enemies){
   let a=Math.atan2(player.y-e.y,player.x-e.x),slow=e.slowTimer>0?(e.slow||.55):1;
   if(e.type==='ranged'){
@@ -69,9 +71,26 @@ if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1;toast('护盾
  for(const b of bullets){if(b.boomerang){b.age=(b.age||0)+dt;if(b.age>b.maxLife*.5){b.a=Math.atan2(player.y-b.y,player.x-b.x);b.speed=520}}b.x+=Math.cos(b.a)*b.speed*dt;b.y+=Math.sin(b.a)*b.speed*dt;b.life-=dt;if(b.enemy&&dist(b,player)<b.r+player.r){player.hp-=b.damage;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}b.life=0;continue}if(!b.enemy&&boss&&!boss.dead&&dist(b,boss)<b.r+boss.r){boss.hp-=b.damage;if(b.weapon==='fire'){for(let i=0;i<8;i++)particles.push({x:boss.x,y:boss.y,vx:(Math.random()-.5)*180,vy:(Math.random()-.5)*180,life:.3})}if(boss.spawned&&boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}if(b.pierce<=0)b.life=0;continue}for(const e of enemies){if(e.dead||b.hit?.includes(e.id)||dist(b,e)>=b.r+e.r)continue;hitEnemy(e,b);b.hit=b.hit||[];b.hit.push(e.id);if(b.pierce<=0)b.life=0;else b.pierce--}}
  bullets=bullets.filter(b=>b.life>0&&b.x>-60&&b.x<W+60&&b.y>-60&&b.y<H+60);enemies=enemies.filter(e=>!e.dead);
  if(boss)updateBoss(dt);
+ for(const c of chests){c.life-=dt;if(!c.dead&&dist(c,player)<player.r+c.r+14)openChest(c)}chests=chests.filter(c=>!c.dead&&c.life>0);
  for(const d of drops){let dd=dist(d,player);if(dd<player.magnet){let a=Math.atan2(player.y-d.y,player.x-d.x);d.x+=Math.cos(a)*220*dt;d.y+=Math.sin(a)*220*dt}if(dist(d,player)<player.r+d.r){if(d.type==='xp')gainXp(d.v);else player.gold+=d.v;d.dead=true}}drops=drops.filter(d=>!d.dead);
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}particles=particles.filter(p=>p.life>0);ui()}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function spawnChest(){
+  const margin=70;
+  const chest={x:margin+Math.random()*(W-margin*2),y:margin+Math.random()*(H-margin*2),r:18,dead:false,life:30};
+  chests.push(chest);
+  toast('发现宝箱！靠近它即可开启');
+}
+function openChest(c){
+  if(c.dead)return;
+  c.dead=true;
+  const gold=12+Math.floor(Math.random()*14);
+  const heal=Math.floor(player.maxHp*.18);
+  player.gold+=gold;
+  player.hp=Math.min(player.maxHp,player.hp+heal);
+  for(let i=0;i<18;i++)particles.push({x:c.x,y:c.y,vx:(Math.random()-.5)*220,vy:(Math.random()-.5)*220,life:.6});
+  toast('宝箱开启：+'+gold+' 金币 · 回复 '+heal+' HP');
+}
 function spawnEnemy(){
   let s=Math.floor(Math.random()*4),x=s<2?(s?W+30:-30):Math.random()*W,y=s<2?Math.random()*H:(s===2?-30:H+30);
   const elite=Math.random()<Math.min(.2,elapsed/420);
@@ -212,6 +231,13 @@ function draw(){
   }
   for(let y=0;y<H;y+=40){
     ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+  }
+  for(const c of chests){
+    const pulse=1+Math.sin(performance.now()/180)*.08;
+    ctx.save();ctx.translate(c.x,c.y);ctx.scale(pulse,pulse);
+    ctx.fillStyle='#d8a84e';ctx.fillRect(-18,-11,36,24);
+    ctx.fillStyle='#f6d978';ctx.fillRect(-18,-11,36,6);ctx.fillRect(-3,-11,6,24);
+    ctx.strokeStyle='#fff0a0';ctx.lineWidth=2;ctx.strokeRect(-18,-11,36,24);ctx.restore();
   }
   for(const d of drops){
     ctx.fillStyle=d.type==='xp'?'#63a4ff':'#ffd45c';
