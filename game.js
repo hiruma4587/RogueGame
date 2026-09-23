@@ -1,5 +1,5 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
-let W,H,dpr,state='menu',gameSpeed=1,bossRewards=[],meta={gold:0,upgrades:{hp:0,damage:0,speed:0}},player,enemies=[],bullets=[],drops=[],particles=[],chests=[],events=[],keys={},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0,nextChest=90,nextEvent=60;
+let W,H,dpr,state='menu',gameSpeed=1,bossRewards=[],relics=[],meta={gold:0,upgrades:{hp:0,damage:0,speed:0}},player,enemies=[],bullets=[],drops=[],particles=[],chests=[],events=[],keys={},elapsed=0,spawn=0,last=0,boss=null,joystick={active:false,id:null,x:0,y:0},lastShot=0,nextChest=90,nextEvent=60;
 const WEAPONS={
   magic:{name:'魔法弹',desc:'自动追踪最近敌人',level:1,damage:18,rate:.45,count:1,speed:600,life:1.2,pierce:0,color:'#ffe08a'},
   knife:{name:'飞刀',desc:'高速穿透敌人',level:0,damage:12,rate:.7,count:1,speed:720,life:1.3,pierce:1,color:'#b8e1ff'},
@@ -37,8 +37,8 @@ joystickEl.addEventListener('pointermove',e=>{if(joystick.active&&e.pointerId===
 function releaseJoystick(e){if(e.pointerId!==joystick.id)return;joystick.active=false;joystick.id=null;joystick.x=joystick.y=0;stickEl.style.transform='translate(0,0)'}
 joystickEl.addEventListener('pointerup',releaseJoystick);joystickEl.addEventListener('pointercancel',releaseJoystick);
 
-function fresh(){return{x:W/2,y:H/2,r:15,hp:100+meta.upgrades.hp*10,maxHp:100+meta.upgrades.hp*10,speed:230*(1+meta.upgrades.speed*.05),damageMul:1+meta.upgrades.damage*.05,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
-function start(data){canvas.style.pointerEvents='none';if(matchMedia('(pointer: coarse)').matches)show('joystick');gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];chests=[];events=[];boss=null;nextChest=90;nextEvent=60;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
+function fresh(){return{x:W/2,y:H/2,r:15,hp:100+meta.upgrades.hp*10,maxHp:100+meta.upgrades.hp*10,speed:230*(1+meta.upgrades.speed*.05),damageMul:1+meta.upgrades.damage*.05,rateMul:1,magnet:80,level:1,xp:0,next:10,gold:0,kills:0,xpMul:1,crit:0,shield:false,relics:[],weapons:{magic:{...WEAPONS.magic}},passives:[],fire:{},startedAt:Date.now()}}
+function start(data){canvas.style.pointerEvents='none';if(matchMedia('(pointer: coarse)').matches)show('joystick');gameSpeed=1;updateSpeedButton();elapsed=0;spawn=0;enemies=[];bullets=[];drops=[];particles=[];chests=[];events=[];boss=null;nextChest=90;nextEvent=60;player=fresh();if(data){Object.assign(player,data);player.weapons=Object.assign({},fresh().weapons,data.weapons||{});player.passives=data.passives||[];player.relics=data.relics||[];player.gold=0}state='playing';hide('menu');hide('result');hide('levelup');hide('victory');last=performance.now();requestAnimationFrame(loop)}
 function hide(id){const el=$(id);if(el)el.classList.add('hidden')}function show(id){const el=$(id);if(el)el.classList.remove('hidden')}
 function goHome(){state='menu';gameSpeed=1;updateSpeedButton();hide('result');hide('victory');hide('levelup');hide('metaPanel');hide('joystick');show('menu');canvas.style.pointerEvents='none';renderMeta()}
 function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/1000)*gameSpeed;last=t;update(dt);draw();requestAnimationFrame(loop)}
@@ -154,7 +154,7 @@ function autoShoot(dt){
   }
 }
 function shootWeapon(id,w){
-  const damage=w.damage*player.damageMul*(Math.random()<player.crit?2:1);
+  const damage=w.damage*player.damageMul*relicDamageMul(null)*(Math.random()<player.crit?2:1);
   if(id==='lightning'){
     const targets=enemies.filter(e=>!e.dead).sort((a,b)=>dist(a,player)-dist(b,player)).slice(0,w.count||3);
     if(boss&&!boss.dead&&targets.length<(w.count||3))targets.push(boss);
@@ -165,7 +165,7 @@ function shootWeapon(id,w){
   if(id==='holy'){
     const radius=w.evolved?180:115;
     for(const e of enemies)if(!e.dead&&dist(e,player)<radius){e.hp-=damage;if(e.hp<=0)kill(e)}
-    if(boss&&!boss.dead&&dist(boss,player)<radius){boss.hp-=damage;if(boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}}
+    if(boss&&!boss.dead&&dist(boss,player)<radius){boss.hp-=damage*relicDamageMul(boss);if(boss.hp<=0&&!boss.defeated){boss.defeated=true;boss.dead=true;victory();return}}
     for(let i=0;i<12;i++)particles.push({x:player.x+(Math.random()-.5)*radius*2,y:player.y+(Math.random()-.5)*radius*2,vx:0,vy:0,life:.35,holy:true});
     return;
   }
@@ -177,7 +177,7 @@ function shootWeapon(id,w){
   }
 }
 function hitEnemy(e,b){
-  e.hp-=b.damage*(e.shieldTimer>0?(1-(e.shield||.45)):1);hitFx(e.x,e.y,b.weapon==='fire'?'#ff7a45':'#fff');
+  e.hp-=b.damage*relicDamageMul(e)*(e.shieldTimer>0?(1-(e.shield||.45)):1);hitFx(e.x,e.y,b.weapon==='fire'?'#ff7a45':'#fff');
   if(b.weapon==='ice'){e.slow=.45;e.slowTimer=2.5;}
   if(b.weapon==='fire'){
     const w=player.weapons.fire;
@@ -246,8 +246,8 @@ function persistMeta(){try{localStorage.setItem('roguegame_meta',JSON.stringify(
 function restoreLocalMeta(){try{const x=JSON.parse(localStorage.getItem('roguegame_meta')||'null');if(x&&typeof x==='object'){meta={gold:Number(x.gold||0),upgrades:{hp:Number(x.upgrades?.hp||0),damage:Number(x.upgrades?.damage||0),speed:Number(x.upgrades?.speed||0)}}}}catch(e){}}
 function bankRunGold(rate=1){if(player&&player.gold>0){const earned=Math.floor(player.gold*Math.max(0,Math.min(1,rate)));meta.gold+=earned;player.gold=0;persistMeta();return earned}return 0}
 async function end(){const runGold=player.gold;const keptGold=bankRunGold(.5);state='result';$('resultTitle').textContent='你倒下了';$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+runGold+' · 本局保留 '+keptGold+' · 永久金币 '+meta.gold+' · 生存 '+fmt(elapsed)+' · 正在保存…';show('result');const result=await saveCloud(false);$('resultText').textContent='等级 '+player.level+' · 击杀 '+player.kills+' · 金币 '+runGold+' · 本局保留 '+keptGold+' · 永久金币 '+meta.gold+' · '+(result.ok?'云存档已保存':'云存档保存失败：'+result.error)}
-async function showBossRewards(){state='bossreward';hide('victory');hide('levelup');const box=$('bossRewards');if(!box)return;box.innerHTML='';const pool=[['gold','宝藏','永久金币 +60',()=>{meta.gold+=60;persistMeta()}],['damage','毁灭之力','本局所有伤害 +20%',()=>player.damageMul*=1.2],['health','生命核心','最大生命 +40，并恢复 40 HP',()=>{player.maxHp+=40;player.hp=Math.min(player.maxHp,player.hp+40)}],['haste','超速核心','本局所有武器冷却 -12%',()=>player.rateMul*=.88],['magnet','磁场核心','拾取范围 +50%',()=>player.magnet*=1.5]];pool.sort(()=>Math.random()-.5).slice(0,3).forEach(r=>{const el=document.createElement('div');el.className='choice';el.innerHTML='<strong>'+r[1]+'</strong><span>'+r[2]+'</span>';el.onclick=()=>{r[3]();hide('bossRewardPanel');victory();};box.appendChild(el)});show('bossRewardPanel')}
-function finishBoss(){if(!boss||boss.defeated)return;boss.hp=0;boss.dead=true;boss.defeated=true;bullets=[];enemies=[];hide('levelup');hide('result');hide('menu');hide('victory');for(let i=0;i<60;i++){const a=Math.random()*Math.PI*2,s=80+Math.random()*320;particles.push({x:boss.x,y:boss.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.8+Math.random()*.7,color:'#ffd45c'})}showBossRewards()}
+async function showBossRewards(){state='bossreward';hide('victory');hide('levelup');const box=$('bossRewards');if(!box)return;box.innerHTML='';const pool=[['gold','宝藏','永久金币 +60',()=>{meta.gold+=60;persistMeta()}],['damage','毁灭之力','本局所有伤害 +20%',()=>player.damageMul*=1.2],['health','生命核心','最大生命 +40，并恢复 40 HP',()=>{player.maxHp+=40;player.hp=Math.min(player.maxHp,player.hp+40)}],['haste','超速核心','本局所有武器冷却 -12%',()=>player.rateMul*=.88],['magnet','磁场核心','拾取范围 +50%',()=>player.magnet*=1.5],['relic','远古遗物','获得一个随机遗物',()=>addRandomRelic()]];pool.sort(()=>Math.random()-.5).slice(0,3).forEach(r=>{const el=document.createElement('div');el.className='choice';el.innerHTML='<strong>'+r[1]+'</strong><span>'+r[2]+'</span>';el.onclick=()=>{r[3]();hide('bossRewardPanel');victory();};box.appendChild(el)});show('bossRewardPanel')}
+function addRandomRelic(){const pool=[['狂战符文','生命低于50%时伤害 +25%',p=>p.relics.push('berserk')],['迅捷符文','移动速度 +12%',p=>{p.relics.push('swift');p.speed*=1.12}],['贪婪符文','金币获取 +25%',p=>p.relics.push('greed')],['坚壁符文','受到伤害 -12%',p=>p.relics.push('guard')],['猎手符文','对 Boss 伤害 +20%',p=>p.relics.push('hunter')]];const r=pool[Math.floor(Math.random()*pool.length)];r[2](player);toast('获得遗物：'+r[0]);return r[0]}\nfunction relicDamageMul(target){let m=1;if(player.relics?.includes('berserk')&&player.hp<player.maxHp*.5)m*=1.25;if(target===boss&&player.relics?.includes('hunter'))m*=1.2;return m}\nfunction victory(){if(!player)return;state='victory';hide('bossRewardPanel');hide('levelup');hide('menu');hide('result');show('victory');const earned=player.gold;const kept=bankRunGold(1);$('victoryText').textContent='最终 Boss 已击败！本局获得 '+earned+' 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 正在保存…';saveCloud(false).then(r=>{$('victoryText').textContent=r.ok?'最终 Boss 已击败！本局获得 '+earned+' 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 云存档已保存':'最终 Boss 已击败！本局获得 '+earned+' 金币 · 等级 '+player.level+' · 永久金币 '+meta.gold+' · 保存失败：'+r.error})}\nfunction finishBoss(){if(!boss||boss.defeated)return;boss.hp=0;boss.dead=true;boss.defeated=true;bullets=[];enemies=[];hide('levelup');hide('result');hide('menu');hide('victory');for(let i=0;i<60;i++){const a=Math.random()*Math.PI*2,s=80+Math.random()*320;particles.push({x:boss.x,y:boss.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.8+Math.random()*.7,color:'#ffd45c'})}showBossRewards()}
 function fmt(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
 function ui(){$('hp').textContent=Math.ceil(player.hp)+'/'+player.maxHp;$('level').textContent=player.level;$('gold').textContent=player.gold;$('time').textContent=fmt(elapsed);$('hpbar').style.width=Math.max(0,player.hp/player.maxHp*100)+'%';$('xpbar').style.width=Math.min(100,player.xp/player.next*100)+'%';$('weapon').textContent=Object.values(player.weapons).filter(Boolean).map(w=>w.name+' Lv.'+w.level).join(' · ');if(boss){$('bossbar').classList.remove('hidden');$('bossfill').style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%'}else $('bossbar').classList.add('hidden')}
 function weaponFx(b){
