@@ -46,7 +46,7 @@ function loop(t){if(state!=='playing')return;const dt=Math.min(.033,(t-last)/100
 function reportRuntimeError(e,stage){if(runtimeErrorShown)return;runtimeErrorShown=true;state='paused';console.error('[RogueGame]',stage,e);const msg=(e&&e.message)||String(e)||'未知错误';let box=$('runtimeError');if(!box){box=document.createElement('section');box.id='runtimeError';box.style.cssText='position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.72);font-family:system-ui,sans-serif;color:#fff';box.innerHTML='<div style="width:min(92vw,520px);background:#121722;border:1px solid #5b6578;border-radius:16px;padding:22px;box-shadow:0 20px 80px #000;text-align:center"><h2 style="margin:0 0 10px">游戏运行已暂停</h2><p id="runtimeErrorText" style="color:#ffb4b4;word-break:break-word"></p><p id="runtimeErrorStage" style="color:#9da8bb;font-size:12px"></p><button id="runtimeRestart" style="width:100%;padding:12px;border:0;border-radius:10px;background:#6d8cff;color:#fff;font-size:16px">重新开始本局</button><button id="runtimeHome" style="width:100%;padding:12px;margin-top:8px;border:0;border-radius:10px;background:#252c3a;color:#fff;font-size:16px">返回首页</button></div>';document.body.appendChild(box);$('runtimeRestart').onclick=()=>{box.remove();runtimeErrorShown=false;start()};$('runtimeHome').onclick=()=>{box.remove();runtimeErrorShown=false;goHome()}}$('runtimeErrorText').textContent='错误：'+msg;$('runtimeErrorStage').textContent='发生位置：'+stage+' · 时间：'+fmt(elapsed);if(typeof toast==='function')toast('游戏异常：'+msg)}
 function update(dt){elapsed+=dt;spawn-=dt;
  let dx=(keys.d?1:0)-(keys.a?1:0),dy=(keys.s?1:0)-(keys.w?1:0);if(joystick.active){dx+=joystick.x;dy+=joystick.y}let l=Math.hypot(dx,dy)||1;if(dx||dy){player.x=Math.max(20,Math.min(W-20,player.x+dx/l*player.speed*dt));player.y=Math.max(20,Math.min(H-20,player.y+dy/l*player.speed*dt))}
- if(elapsed>=300&&!boss){spawnBoss();}
+ if(elapsed>=600&&!boss){spawnBoss();}
  if(elapsed>=nextChest&&!boss){spawnChest();nextChest+=90}
  if(elapsed>=nextEvent&&!boss){spawnEvent();nextEvent+=120}
  if(!boss&&spawn<=0){spawn=Math.max(.18,1-elapsed/360);if(enemies.length<MAX_ENEMIES)spawnEnemy()}autoShoot(dt);
@@ -218,6 +218,7 @@ const WEAPON_SYNERGIES={
 };
 function synergyChoices(){const ids=Object.keys(player.weapons);const out=[];if(ids.includes('fire')&&ids.includes('ice')&&!player.synergyFI)out.push(['冰火湮灭','火焰与冰霜共鸣：两种武器伤害 +25%，命中时额外造成一次范围爆裂',()=>{player.damageMul*=1.25;player.synergyFI=true}]);if(ids.includes('magic')&&ids.includes('lightning')&&!player.synergyML)out.push(['奥术雷暴','魔法弹与闪电链共鸣：攻击速度 +15%，闪电额外伤害 +20%',()=>{player.rateMul*=.85;player.synergyML=true}]);if(ids.includes('knife')&&ids.includes('boomerang')&&!player.synergyKB)out.push(['刃舞','飞刀与回旋刃共鸣：移动速度 +10%，两种武器伤害 +18%',()=>{player.speed*=1.1;player.damageMul*=1.18;player.synergyKB=true}]);if(ids.includes('holy')&&player.relics?.includes('guard')&&!player.synergyHG)out.push(['圣壁','圣光与坚壁符文共鸣：受到伤害额外降低 10%',()=>player.synergyHG=true]);return out}
 function options(){
+  const syn=synergyChoices().map(s=>({title:'技能融合：'+s[0],desc:s[1],apply:s[2],kind:'synergy'}));
   let arr=[];
   const ws=Object.entries(WEAPONS).filter(([id])=>!player.weapons[id]||player.weapons[id].level<5);
   for(const [id,w] of ws){
@@ -228,7 +229,8 @@ function options(){
       arr.push({title:w.name+' 升级 Lv.'+next+(willEvolve?' · 即将进化':''),desc:(willEvolve?EVOLUTIONS[id].desc:'伤害 +25%，攻击频率提升')+' · '+(WEAPON_SYNERGIES[id]?.desc||''),apply:()=>{x.level++;x.damage*=1.25;x.rate*=.88;x.count=Math.min(5,x.count+(id==='magic'&&x.level%3===0?1:0));x.pierce=(x.pierce||0)+(id==='knife'&&x.level%2===0?1:0);WEAPON_SYNERGIES[id]?.apply(player);if(x.level>=5&&!x.evolved&&EVOLUTIONS[id])EVOLUTIONS[id].apply(x)}});
     }
   }
-  return arr.sort(()=>Math.random()-.5).slice(0,3)
+  const normal=arr.sort(()=>Math.random()-.5).slice(0,Math.max(0,3-syn.length));
+  return [...syn.slice(0,3),...normal].slice(0,3)
 }
 function spawnBoss(){
   const hp=15000+elapsed*12;
