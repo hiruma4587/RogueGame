@@ -220,7 +220,8 @@ function options(){
   return arr.sort(()=>Math.random()-.5).slice(0,3)
 }
 function spawnBoss(){
-  boss={x:W/2,y:-90,r:42,maxHp:15000+elapsed*12,hp:15000+elapsed*12,speed:42,dmg:30,phase:1,shot:1,spawned:false,defeated:false,intro:2.5,skill:4,flash:0};
+  const hp=15000+elapsed*12;
+  boss={x:W/2,y:-90,r:42,maxHp:hp,hp,speed:42,dmg:30,phase:1,shot:1,spawned:false,defeated:false,intro:2.5,skill:4,flash:0,summon:8,teleport:14};
   toast('BOSS 即将出现！');
 }
 function updateBoss(dt){
@@ -232,7 +233,9 @@ function updateBoss(dt){
     return;
   }
   let a=Math.atan2(player.y-boss.y,player.x-boss.x);boss.x+=Math.cos(a)*boss.speed*dt;boss.y+=Math.sin(a)*boss.speed*dt;if(dist(boss,player)<boss.r+player.r){player.hp-=boss.dmg*dt;if(player.hp<=0){if(player.shield){player.shield=false;player.hp=1}else{end();return}}}boss.shot-=dt;
-  boss.skill-=dt;
+  boss.skill-=dt;boss.summon-=dt;boss.teleport-=dt;
+  if(boss.summon<=0){boss.summon=boss.phase===1?11:7;const n=boss.phase===1?3:6;for(let i=0;i<n;i++){spawnEnemy();const e=enemies[enemies.length-1];e.x=boss.x+(Math.random()-.5)*180;e.y=boss.y+(Math.random()-.5)*180;e.elite=boss.phase===2&&Math.random()<.25}toast(boss.phase===1?'BOSS 召唤援军！':'BOSS 召唤精英援军！')}
+  if(boss.teleport<=0){boss.teleport=boss.phase===1?16:10;const a=Math.random()*Math.PI*2;boss.x=Math.max(60,Math.min(W-60,player.x+Math.cos(a)*(180+Math.random()*120)));boss.y=Math.max(100,Math.min(H-60,player.y+Math.sin(a)*(180+Math.random()*120)));boss.flash=.5;toast('BOSS 瞬移！')}
   if(boss.skill<=0){
     boss.skill=boss.phase===1?6:4;
     boss.flash=.35;
@@ -292,8 +295,8 @@ function draw(){
     ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,7);ctx.fill();
   }
   if(boss){
-    ctx.fillStyle='#ff315c';
-    ctx.beginPath();ctx.arc(boss.x,boss.y,boss.r,0,7);ctx.fill();
+    ctx.save();ctx.globalAlpha=boss.flash>0?.65:1;ctx.fillStyle=boss.phase===2?'#ff7b35':'#ff315c';
+    ctx.beginPath();ctx.arc(boss.x,boss.y,boss.r,0,7);ctx.fill();ctx.restore();
   }
   ctx.fillStyle='#70a1ff';
   ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,7);ctx.fill();
